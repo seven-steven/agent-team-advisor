@@ -23,7 +23,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 ### Phase 1: Repo-Scoped Advisor Foundation
 
-**Goal**: Project maintainers can scaffold and version Advisor Mode assets that keep advisor review separate from executor mutation.
+**Goal**: As a maintainer, I want to scaffold repo-scoped Advisor Mode assets, so that I can safely evolve the workflow.
 **Mode:** mvp
 **Depends on**: Nothing (first phase)
 **Requirements**: AGNT-01, AGNT-02, AGNT-03, SETP-01
@@ -33,7 +33,19 @@ Decimal phases appear between their surrounding integers in numeric order.
 2. Project maintainer can define an advisor agent that uses a stronger model alias and exposes only read-only review tools.
 3. User can run an executor-led workflow where workspace mutation and implementation tools remain available only to the executor.
 4. Project maintainer can commit and version advisor-mode behavior as project-scoped Claude Code assets inside the repository.
-   **Plans**: TBD
+
+**Plans:** 3 plans
+
+Plans:
+
+**Wave 1**
+
+- [ ] 01-01-PLAN.md — Create the repo-local scaffold command and Walking Skeleton assets.
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 01-02-PLAN.md — Validate and harden advisor/executor role boundaries.
+- [ ] 01-03-PLAN.md — Document and test the versioned scaffold layout.
 
 ### Phase 2: Enforced Trigger Gates
 
@@ -101,7 +113,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 
 | Phase                                        | Plans Complete | Status      | Completed |
 | -------------------------------------------- | -------------- | ----------- | --------- |
-| 1. Repo-Scoped Advisor Foundation            | 0/TBD          | Not started | -         |
+| 1. Repo-Scoped Advisor Foundation            | 0/3            | Planned     | -         |
 | 2. Enforced Trigger Gates                    | 0/TBD          | Not started | -         |
 | 3. Verdict Handoff and Verification Evidence | 0/TBD          | Not started | -         |
 | 4. Provider Routing and Conformance          | 0/TBD          | Not started | -         |
