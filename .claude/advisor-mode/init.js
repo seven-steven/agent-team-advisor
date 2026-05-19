@@ -4,6 +4,13 @@ const path = require('path');
 
 const BOUNDARY_COMMAND = '"/usr/bin/node" "$CLAUDE_PROJECT_DIR"/.claude/hooks/advisor-boundary-check.js';
 const AUDIT_COMMAND = '"/usr/bin/node" "$CLAUDE_PROJECT_DIR"/.claude/hooks/advisor-install-audit.js';
+const GITIGNORE_RULES = [
+  '.advisor/audit/*.jsonl',
+  '!.advisor/audit/.gitkeep',
+  '.advisor/state/*.json',
+  '!.advisor/state/.gitkeep',
+];
+const RUNTIME_PLACEHOLDERS = ['.advisor/audit/.gitkeep', '.advisor/state/.gitkeep'];
 
 const files = {
   '.claude/agents/advisor-reviewer.md': `---
@@ -182,6 +189,10 @@ function hookCommandExists(entries, command) {
   return entries.some((entry) => (entry.hooks || []).some((hook) => hook.command === command));
 }
 
+function advisorHook(command, timeout = 5) {
+  return [{ type: 'command', command, timeout }];
+}
+
 function addHook(settings, eventName, hookEntry, command) {
   settings.hooks ||= {};
   settings.hooks[eventName] ||= [];
@@ -200,7 +211,7 @@ function mergeSettings(rootDir) {
     'PreToolUse',
     {
       matcher: 'Bash|Edit|Write|MultiEdit',
-      hooks: [{ type: 'command', command: BOUNDARY_COMMAND, timeout: 5 }],
+      hooks: advisorHook(BOUNDARY_COMMAND),
     },
     BOUNDARY_COMMAND,
   );
@@ -209,7 +220,7 @@ function mergeSettings(rootDir) {
     'PostToolUse',
     {
       matcher: 'Bash|Edit|Write|MultiEdit|Agent|Task',
-      hooks: [{ type: 'command', command: AUDIT_COMMAND, timeout: 5 }],
+      hooks: advisorHook(AUDIT_COMMAND),
     },
     AUDIT_COMMAND,
   );
@@ -219,15 +230,9 @@ function mergeSettings(rootDir) {
 
 function mergeGitignore(rootDir) {
   const gitignorePath = path.join(rootDir, '.gitignore');
-  const rules = [
-    '.advisor/audit/*.jsonl',
-    '!.advisor/audit/.gitkeep',
-    '.advisor/state/*.json',
-    '!.advisor/state/.gitkeep',
-  ];
   const existing = fs.existsSync(gitignorePath) ? fs.readFileSync(gitignorePath, 'utf8') : '';
   const lines = new Set(existing.split(/\r?\n/).filter(Boolean));
-  const additions = rules.filter((rule) => !lines.has(rule));
+  const additions = GITIGNORE_RULES.filter((rule) => !lines.has(rule));
   if (additions.length === 0) {
     return;
   }
@@ -240,11 +245,12 @@ function scaffoldAdvisorMode(rootDir = process.cwd()) {
   for (const [relativePath, content] of Object.entries(files)) {
     writeFile(resolvedRoot, relativePath, content);
   }
-  writeFile(resolvedRoot, '.advisor/audit/.gitkeep', '');
-  writeFile(resolvedRoot, '.advisor/state/.gitkeep', '');
+  for (const relativePath of RUNTIME_PLACEHOLDERS) {
+    writeFile(resolvedRoot, relativePath, '');
+  }
   mergeSettings(resolvedRoot);
   mergeGitignore(resolvedRoot);
-  return { rootDir: resolvedRoot, files: Object.keys(files) };
+  return { rootDir: resolvedRoot, files: [...Object.keys(files), ...RUNTIME_PLACEHOLDERS] };
 }
 
 function main(argv = process.argv.slice(2)) {
