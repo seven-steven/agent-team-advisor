@@ -6,6 +6,7 @@ const path = require('node:path');
 const { execFileSync } = require('node:child_process');
 
 const initScript = path.resolve(__dirname, '..', 'init.js');
+const EXECUTOR_MUTATION_TOOLS = ['Bash', 'Write', 'Edit', 'MultiEdit'];
 
 function makeTempRepo() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'advisor-mode-init-'));
@@ -78,6 +79,22 @@ test('scaffold creates advisor-mode assets and preserves settings idempotently',
   assert.match(advisorAgent, /^model: opus$/m);
   assert.match(advisorAgent, /^tools: Read, Grep, Glob$/m);
   assert.doesNotMatch(advisorAgent, /\b(Bash|Write|Edit|MultiEdit)\b/);
+  assert.match(advisorAgent, /Return a verdict-first response with:/);
+  assert.match(advisorAgent, /risk level and confidence/);
+  assert.match(advisorAgent, /blocking findings/);
+  assert.match(advisorAgent, /recommended executor actions/);
+  assert.match(advisorAgent, /verification guidance/);
+
+  const boundaryHook = require(path.join(root, '.claude/hooks/advisor-boundary-check.js'));
+  assert.equal(typeof boundaryHook.validateAdvisorBoundary, 'function');
+  assert.equal(typeof boundaryHook.main, 'function');
+  assert.equal(boundaryHook.validateAdvisorBoundary(root).ok, true);
+
+  const executorGuidance = read(root, '.claude/agents/executor-guidance.md');
+  assert.match(executorGuidance, /executor owns/i);
+  for (const tool of EXECUTOR_MUTATION_TOOLS) {
+    assert.match(executorGuidance, new RegExp(`\\b${tool}\\b`), `${tool} should be executor-owned`);
+  }
 
   const settings = JSON.parse(read(root, '.claude/settings.json'));
   const postToolCommands = settingsCommands(settings, 'PostToolUse');
