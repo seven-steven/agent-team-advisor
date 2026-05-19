@@ -7,7 +7,7 @@ color: "#2563EB"
 
 # Executor Guidance
 
-The executor owns implementation, workspace mutation, tool execution, verification, commits, and final decisions.
+The executor owns implementation, workspace mutation, tool execution, verification, commits, and final decisions. Executor-only mutation tools include Bash, Write, Edit, and MultiEdit.
 
 Advisor Mode consultations are advisory and read-only. Treat advisor verdicts as structured risk input, then decide and execute the minimum safe change needed for the current task.
 
