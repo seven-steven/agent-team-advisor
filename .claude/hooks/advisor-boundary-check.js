@@ -36,6 +36,10 @@ function parseTools(value) {
     .filter(Boolean);
 }
 
+function hasRequiredToolSet(tools) {
+  return tools.length === REQUIRED_TOOLS.length && REQUIRED_TOOLS.every((tool) => tools.includes(tool));
+}
+
 function validateAdvisorBoundary(rootDir) {
   const findings = [];
   let frontmatter = {};
@@ -47,8 +51,11 @@ function validateAdvisorBoundary(rootDir) {
     findings.push(`advisor-reviewer.md unreadable: ${error.message}`);
   }
 
+  const modelFinding = frontmatter.model
+    ? `advisor model must be ${REQUIRED_MODEL}, found ${frontmatter.model}`
+    : 'advisor model is omitted';
   if (frontmatter.model !== REQUIRED_MODEL) {
-    findings.push(frontmatter.model ? `advisor model must be ${REQUIRED_MODEL}, found ${frontmatter.model}` : 'advisor model is omitted');
+    findings.push(modelFinding);
   }
 
   const advisorTools = parseTools(frontmatter.tools);
@@ -62,7 +69,7 @@ function validateAdvisorBoundary(rootDir) {
       findings.push(`advisor tools include mutating tool ${tool}`);
     }
   }
-  if (advisorTools.length !== REQUIRED_TOOLS.length || REQUIRED_TOOLS.some((tool) => !advisorTools.includes(tool))) {
+  if (!hasRequiredToolSet(advisorTools)) {
     findings.push(`advisor tools must be exactly ${REQUIRED_TOOLS.join(', ')}`);
   }
 
