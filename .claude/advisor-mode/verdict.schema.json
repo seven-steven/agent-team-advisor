@@ -7,9 +7,9 @@
     "status",
     "risk",
     "confidence",
-    "blockingFindings",
-    "recommendedActions",
-    "verificationGuidance"
+    "blocking_findings",
+    "recommended_actions",
+    "verification_guidance"
   ],
   "properties": {
     "status": {
@@ -38,19 +38,19 @@
         "high"
       ]
     },
-    "blockingFindings": {
+    "blocking_findings": {
       "type": "array",
       "items": {
         "type": "string"
       }
     },
-    "recommendedActions": {
+    "recommended_actions": {
       "type": "array",
       "items": {
         "type": "string"
       }
     },
-    "verificationGuidance": {
+    "verification_guidance": {
       "type": "array",
       "items": {
         "type": "string"
