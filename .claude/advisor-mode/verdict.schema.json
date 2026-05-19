@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Advisor Mode Verdict",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "status",
+    "risk",
+    "confidence",
+    "blockingFindings",
+    "recommendedActions",
+    "verificationGuidance"
+  ],
+  "properties": {
+    "status": {
+      "type": "string",
+      "enum": [
+        "PASS",
+        "CONCERNS",
+        "FAIL",
+        "BLOCKED"
+      ]
+    },
+    "risk": {
+      "type": "string",
+      "enum": [
+        "low",
+        "medium",
+        "high",
+        "critical"
+      ]
+    },
+    "confidence": {
+      "type": "string",
+      "enum": [
+        "low",
+        "medium",
+        "high"
+      ]
+    },
+    "blockingFindings": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "recommendedActions": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "verificationGuidance": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}
