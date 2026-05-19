@@ -34,13 +34,13 @@ Decimal phases appear between their surrounding integers in numeric order.
 3. User can run an executor-led workflow where workspace mutation and implementation tools remain available only to the executor.
 4. Project maintainer can commit and version advisor-mode behavior as project-scoped Claude Code assets inside the repository.
 
-**Plans:** 3 plans
+**Plans:** 1/3 plans executed
 
 Plans:
 
 **Wave 1**
 
-- [ ] 01-01-PLAN.md — Create the repo-local scaffold command and Walking Skeleton assets.
+- [x] 01-01-PLAN.md — Create the repo-local scaffold command and Walking Skeleton assets.
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
@@ -113,7 +113,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 
 | Phase                                        | Plans Complete | Status      | Completed |
 | -------------------------------------------- | -------------- | ----------- | --------- |
-| 1. Repo-Scoped Advisor Foundation            | 0/3            | Planned     | -         |
+| 1. Repo-Scoped Advisor Foundation            | 1/3 | In Progress|  |
 | 2. Enforced Trigger Gates                    | 0/TBD          | Not started | -         |
 | 3. Verdict Handoff and Verification Evidence | 0/TBD          | Not started | -         |
 | 4. Provider Routing and Conformance          | 0/TBD          | Not started | -         |
