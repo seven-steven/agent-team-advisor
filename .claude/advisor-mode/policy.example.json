@@ -6,7 +6,15 @@
     "executorAuthority": "executor-only",
     "runtime": {
       "auditPattern": ".advisor/audit/*.jsonl",
+      "auditTarget": ".advisor/audit/events.jsonl",
       "statePattern": ".advisor/state/*.json"
+    },
+    "auditEvents": {
+      "baseline": [
+        "scaffold.install",
+        "advisor.verdict.received",
+        "executor.followup.recorded"
+      ]
     },
     "phase1": {
       "installsExternalPackages": false,
