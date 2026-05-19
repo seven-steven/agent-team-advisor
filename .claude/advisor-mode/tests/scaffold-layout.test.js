@@ -6,6 +6,17 @@ const path = require('node:path');
 const { execFileSync } = require('node:child_process');
 
 const initScript = path.resolve(__dirname, '..', 'init.js');
+const versionedAssets = [
+  '.claude/agents/advisor-reviewer.md',
+  '.claude/agents/executor-guidance.md',
+  '.claude/hooks/advisor-boundary-check.js',
+  '.claude/hooks/advisor-install-audit.js',
+  '.claude/settings.json',
+  '.claude/advisor-mode/README.md',
+  '.claude/advisor-mode/policy.example.json',
+  '.claude/advisor-mode/verdict.schema.json',
+];
+const runtimeDirectories = ['.advisor/audit', '.advisor/state'];
 
 function makeTempRepo() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'advisor-mode-layout-'));
@@ -33,17 +44,6 @@ test('scaffold documents repo-scoped versioned layout and runtime separation', (
 
   runInit(root);
 
-  const versionedAssets = [
-    '.claude/agents/advisor-reviewer.md',
-    '.claude/agents/executor-guidance.md',
-    '.claude/hooks/advisor-boundary-check.js',
-    '.claude/hooks/advisor-install-audit.js',
-    '.claude/settings.json',
-    '.claude/advisor-mode/README.md',
-    '.claude/advisor-mode/policy.example.json',
-    '.claude/advisor-mode/verdict.schema.json',
-  ];
-
   for (const asset of versionedAssets) {
     assert.match(asset, /^\.claude\//, `${asset} should be a versioned .claude asset`);
     assertExists(root, asset);
@@ -58,17 +58,7 @@ test('scaffold documents repo-scoped versioned layout and runtime separation', (
   assert.match(readme, /node \.claude\/advisor-mode\/init\.js/);
   assert.match(readme, /node --test \.claude\/advisor-mode\/tests\/\*\.test\.js/);
 
-  for (const expected of [
-    '.claude/agents/advisor-reviewer.md',
-    '.claude/agents/executor-guidance.md',
-    '.claude/hooks/advisor-boundary-check.js',
-    '.claude/hooks/advisor-install-audit.js',
-    '.claude/settings.json',
-    '.claude/advisor-mode/policy.example.json',
-    '.claude/advisor-mode/verdict.schema.json',
-    '.advisor/audit',
-    '.advisor/state',
-  ]) {
+  for (const expected of [...versionedAssets.filter((asset) => asset !== '.claude/advisor-mode/README.md'), ...runtimeDirectories]) {
     assert.match(readme, new RegExp(expected.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   }
 
