@@ -4,8 +4,8 @@ milestone: v1.0
 milestone_name: milestone
 status: executing
 stopped_at: Phase 1 context gathered
-last_updated: "2026-05-19T13:18:49.692Z"
-last_activity: 2026-05-19 -- Phase 1 planning complete
+last_updated: "2026-05-19T15:45:49.682Z"
+last_activity: 2026-05-19 -- Phase 01 execution started
 progress:
   total_phases: 5
   completed_phases: 0
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-19)
 
 **Core value:** 在不依赖 server_tool_use 的前提下，让 executor 能自主、可靠、可审计地自动触发 advisor，并据此提升复杂工程任务的质量。
-**Current focus:** Phase 01 — Repo-Scoped Advisor Foundation
+**Current focus:** Phase 01 — repo-scoped-advisor-foundation
 
 ## Current Position
 
-Phase: 01 (Repo-Scoped Advisor Foundation) — EXECUTING
-Plan: 1 of 3
-Status: Ready to execute
-Last activity: 2026-05-19 -- Phase 1 planning complete
+Phase: 01 (repo-scoped-advisor-foundation) — EXECUTING
+Plan: 1 of 4
+Status: Executing Phase 01
+Last activity: 2026-05-19 -- Phase 01 execution started
 
 Progress: [░░░░░░░░░░] 0%
 
