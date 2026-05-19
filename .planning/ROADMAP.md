@@ -13,7 +13,7 @@ Advisor Mode v1 builds a pure client-side Claude Code Teams workflow in dependen
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 1: Repo-Scoped Advisor Foundation** - Maintainers can install project-local advisor assets with enforced executor/advisor role boundaries.
+- [x] **Phase 1: Repo-Scoped Advisor Foundation** - Maintainers can install project-local advisor assets with enforced executor/advisor role boundaries. (completed 2026-05-19)
 - [ ] **Phase 2: Enforced Trigger Gates** - Users can rely on policy-driven advisor and human approval gates before risky or repeated-failure actions proceed.
 - [ ] **Phase 3: Verdict Handoff and Verification Evidence** - Users receive structured advisor guidance, executor rationale, minimized context handoffs, and verification evidence.
 - [ ] **Phase 4: Provider Routing and Conformance** - Maintainers can route Claude semantic aliases to third-party models and validate provider compatibility before critical flows.
@@ -34,7 +34,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 3. User can run an executor-led workflow where workspace mutation and implementation tools remain available only to the executor.
 4. Project maintainer can commit and version advisor-mode behavior as project-scoped Claude Code assets inside the repository.
 
-**Plans:** 1/3 plans executed
+**Plans:** 3/3 plans complete
 
 Plans:
 
@@ -44,8 +44,8 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 01-02-PLAN.md — Validate and harden advisor/executor role boundaries.
-- [ ] 01-03-PLAN.md — Document and test the versioned scaffold layout.
+- [x] 01-02-PLAN.md — Validate and harden advisor/executor role boundaries.
+- [x] 01-03-PLAN.md — Document and test the versioned scaffold layout.
 
 ### Phase 2: Enforced Trigger Gates
 
@@ -113,7 +113,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 
 | Phase                                        | Plans Complete | Status      | Completed |
 | -------------------------------------------- | -------------- | ----------- | --------- |
-| 1. Repo-Scoped Advisor Foundation            | 1/3 | In Progress|  |
+| 1. Repo-Scoped Advisor Foundation            | 3/3 | Complete   | 2026-05-19 |
 | 2. Enforced Trigger Gates                    | 0/TBD          | Not started | -         |
 | 3. Verdict Handoff and Verification Evidence | 0/TBD          | Not started | -         |
 | 4. Provider Routing and Conformance          | 0/TBD          | Not started | -         |
