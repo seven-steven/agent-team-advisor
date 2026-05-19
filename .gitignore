@@ -1,0 +1,4 @@
+.advisor/audit/*.jsonl
+!.advisor/audit/.gitkeep
+.advisor/state/*.json
+!.advisor/state/.gitkeep

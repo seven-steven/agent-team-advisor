@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "advisorMode": {
+    "enabled": true,
+    "advisorAgent": "advisor-reviewer",
+    "executorAuthority": "executor-only",
+    "runtime": {
+      "auditPattern": ".advisor/audit/*.jsonl",
+      "statePattern": ".advisor/state/*.json"
+    },
+    "phase1": {
+      "installsExternalPackages": false,
+      "hooksFailOpen": true
+    }
+  }
+}
