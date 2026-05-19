@@ -24,3 +24,156 @@
 - **Frustrations:** Stay tightly within the requested scope. Ask before adding fallback paths, refactors, or adjacent improvements that were not explicitly requested.
 - **Learning:** Ground explanations and recommendations in official documentation and current references first, then translate that research into a practical plan for this codebase.
 <!-- GSD:profile-end -->
+
+<!-- GSD:project-start source:PROJECT.md -->
+## Project
+
+**Advisor Mode**
+
+Advisor Mode 是一个基于 Claude Code Agent Teams 的纯客户端多模型编排项目。它让成本更低、响应更快的 executor model 负责主循环、工具调用和任务执行，在高风险、高不确定、失败诊断与最终验收阶段自动咨询更强的 advisor model。目标用户是希望在 Claude Code 中把多家第三方模型组合成生产级 coding agent 工作流的开发者或团队。
+
+**Core Value:** 在不依赖 server_tool_use 的前提下，让 executor 能自主、可靠、可审计地自动触发 advisor，并据此提升复杂工程任务的质量。
+
+### Constraints
+
+- **Architecture**: 必须是纯客户端方案 — 不依赖 Anthropic `server_tool_use` / `advisor_20260301`
+- **Runtime**: 必须运行在 Claude Code / Claude Code Teams 语义下 — 以 subagent、hooks、SendMessage 和本地工具为主
+- **Model Routing**: 必须兼容 Anthropic-compatible Provider — 通过 Claude alias 映射真实第三方模型
+- **Safety**: advisor 必须保持只读 — 避免顾问直接执行高风险改动
+- **Observability**: 必须可审计 — 需要记录触发原因、模型路由、token、延迟、成本和最终决策
+- **Operational**: 必须支持预算控制与回滚 — 不能让 advisor 成本和延迟无限增长
+<!-- GSD:project-end -->
+
+<!-- GSD:stack-start source:research/STACK.md -->
+## Technology Stack
+
+## Recommended Stack
+### Core Technologies
+| Technology                             | Version                                                         | Purpose                                                     | Why Recommended                                                                                                                                                                                                                                                             | Confidence  |
+| -------------------------------------- | --------------------------------------------------------------- | ----------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------- |
+| Claude Code / Claude Code Teams        | Current CLI, docs reference v2.x era capabilities               | Primary client-side orchestrator                            | Claude Code already provides the primitives this product needs: subagents, hooks, project-local settings, model aliases, permissions, and lifecycle interception. Use it as the orchestration substrate instead of rebuilding an agent loop.                                | HIGH        |
+| Project-local Claude Code assets       | `.claude/agents/`, `.claude/settings.json`, `.claude/commands/` | Workflow distribution format                                | Advisor Mode should ship as Claude Code-native project assets: advisor subagent definitions, hook scripts, slash commands, and settings. This keeps setup inspectable, versionable, and reversible.                                                                         | HIGH        |
+| Anthropic-compatible provider endpoint | `ANTHROPIC_BASE_URL` + `ANTHROPIC_AUTH_TOKEN`                   | Route Claude Code requests to third-party models            | Official Claude Code gateway docs support pointing Claude Code at LLM gateways with `ANTHROPIC_BASE_URL`; OpenRouter also documents direct Anthropic Messages API compatibility. This is the cleanest way to preserve Claude Code semantics while using third-party models. | HIGH        |
+| OpenRouter Anthropic-compatible API    | Current                                                         | Default managed gateway for third-party model routing       | For a greenfield client-side workflow, OpenRouter is the most convenient managed option because it exposes an Anthropic-compatible endpoint directly usable by Claude Code: `ANTHROPIC_BASE_URL=https://openrouter.ai/api`. Use this first for low-ops validation.          | MEDIUM-HIGH |
+| LiteLLM Proxy                          | 1.85.0                                                          | Self-hosted gateway / policy layer                          | Use LiteLLM when you need stronger routing policy, virtual keys, budgets, aliases, fallbacks, self-hosted audit boundaries, or provider abstraction beyond OpenRouter. LiteLLM supports Anthropic SDK-compatible calls through proxy endpoints and virtual keys.            | HIGH        |
+| TypeScript                             | 6.0.3                                                           | Hook scripts, policy engine, config tooling                 | TypeScript is the right implementation language for Claude Code-adjacent tooling because Claude Code and Anthropic SDK examples are TypeScript-friendly, scripts can run locally, schemas can be typed, and npm packaging is straightforward.                               | HIGH        |
+| Node.js                                | 24 LTS target, Node 22 minimum                                  | Runtime for hooks and local CLI scripts                     | Use Node for portable local execution. Avoid Python for hook logic unless LiteLLM self-hosting requires it; keeping policy/hook logic in one TS runtime reduces operational friction.                                                                                       | MEDIUM      |
+| `@anthropic-ai/claude-agent-sdk`       | 0.3.144                                                         | Optional programmatic orchestration tests and harnesses     | Use only for test harnesses or scripted verification of subagent behavior. Do not make it the core runtime if the product is meant to run inside Claude Code Teams via project assets.                                                                                      | MEDIUM-HIGH |
+| `@anthropic-ai/sdk`                    | 0.97.0                                                          | Compatibility test client for Anthropic-compatible gateways | Use it to smoke-test provider compatibility, streaming, tool-use behavior, and alias routing outside Claude Code. It supports custom `base_url` style usage through provider/gateway patterns and current Messages API types.                                               | HIGH        |
+### Supporting Libraries
+| Library          | Version          | Purpose                                                             | When to Use                                                                                                                                                                                                                                                   | Confidence  |
+| ---------------- | ---------------- | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------- |
+| Zod              | 4.4.3            | Schema validation for advisor outputs, hook configs, route policies | Use for all structured advisor contracts: risk reports, escalation decisions, final-review checklists, budget policy, and provider routing config. Zod 4 has first-party JSON Schema conversion via `z.toJSONSchema()`, useful for prompt contracts and docs. | HIGH        |
+| `yaml`           | 2.9.0            | Read/write Claude Code agent frontmatter and LiteLLM config         | Use for generating `.claude/agents/*.md`, validating frontmatter, and optionally producing LiteLLM `config.yaml`.                                                                                                                                             | HIGH        |
+| Commander        | 14.0.3           | Local setup/doctor CLI                                              | Use for `advisor-mode init`, `advisor-mode doctor`, `advisor-mode validate`, and `advisor-mode rollback`. Keep it small; do not introduce a full app framework.                                                                                               | HIGH        |
+| Pino             | 10.3.1           | Structured local logs                                               | Use for JSONL audit events from hooks: trigger reason, tool name, risk class, model alias, routed provider/model if available, latency, token/cost estimate, and final decision.                                                                              | HIGH        |
+| OpenTelemetry JS | 0.218.0 packages | Optional traces/metrics export                                      | Use after MVP when teams need OTLP export. Start with local JSONL first; add OpenTelemetry for enterprise observability or multi-machine aggregation.                                                                                                         | MEDIUM-HIGH |
+| Vitest           | 4.1.6            | Unit tests for hook predicates and schema contracts                 | Use for deterministic policy tests: dangerous command detection, repeated-failure escalation, final review required, budget cutoff, malformed advisor output.                                                                                                 | HIGH        |
+| tsx              | 4.22.3           | Run TypeScript hooks/dev scripts locally                            | Use for development and project-local hook scripts before packaging compiled JS. For production templates, prefer compiled JS or pinned `npx tsx` instructions.                                                                                               | HIGH        |
+### Development Tools
+| Tool                             | Purpose                                      | Notes                                                                                                                                                                                                                                    | Confidence  |
+| -------------------------------- | -------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------- |
+| Claude Code hooks                | Enforce advisor consultation gates           | Use `PreToolUse` for high-risk tool calls, `PostToolUse` for failure detection and audit enrichment, `Stop` for final review gating, and `SubagentStop` for advisor output validation. Hooks can use exit-code blocking and JSON output. | HIGH        |
+| Claude Code subagents            | Read-only advisor role                       | Define advisor in `.claude/agents/advisor.md` with `tools: Read, Grep, Glob` and `model: opus`. Do not grant `Edit`, `Write`, or `Bash` by default.                                                                                      | HIGH        |
+| Claude Code settings             | Project-local env, hooks, permissions        | Prefer project-local `.claude/settings.json` for reproducible team behavior. Use environment variables for secrets only.                                                                                                                 | HIGH        |
+| Provider smoke-test script       | Verify Anthropic-compatible gateway behavior | Add a local script that sends Messages API requests through `ANTHROPIC_BASE_URL` using `@anthropic-ai/sdk` and checks model alias resolution, streaming, tool-use compatibility, and error shape.                                        | MEDIUM-HIGH |
+| JSONL audit log                  | Minimum viable observability                 | Store local `.advisor/logs/*.jsonl` or equivalent ignored path. Capture escalation reason, hook event, requested alias, actual provider/model when known, latency, cost estimate, and allow/block decision.                              | HIGH        |
+| LiteLLM virtual keys and aliases | Budgeted self-host routing                   | Use when running LiteLLM. Virtual keys support alias mapping and can enforce per-team/project budgets.                                                                                                                                   | HIGH        |
+## Installation
+# Core local tooling
+# Optional programmatic Claude Code harness
+# Optional observability
+# Dev dependencies
+## Alternatives Considered
+| Recommended                      | Alternative                     | When to Use Alternative                                                                                                                                                                      |
+| -------------------------------- | ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Claude Code Teams project assets | Custom standalone orchestrator  | Use a custom orchestrator only if you need to run outside Claude Code entirely. For this project, it would duplicate hooks, permissions, agent lifecycle, and model semantics unnecessarily. |
+| OpenRouter first for validation  | LiteLLM first                   | Use LiteLLM first if the team requires self-hosting, strict budget controls, private provider keys, or deterministic routing logs from day one. Otherwise OpenRouter is faster to validate.  |
+| LiteLLM for self-hosted gateway  | One-off provider-specific proxy | Use a provider-specific proxy only for a narrow proof of concept. It will create routing drift and make model/provider expansion harder.                                                     |
+| TypeScript hook/policy engine    | Bash-only hooks                 | Bash is fine for tiny glue commands, but policy logic needs tests, schemas, structured logs, and maintainability. Use Bash only as a thin launcher.                                          |
+| Zod structured contracts         | Free-form advisor text          | Free-form advisor output is hard to gate on. Use Zod-validated JSON sections for risk level, required actions, validation checklist, and stop/continue decision.                             |
+| JSONL first, OpenTelemetry later | Full tracing from MVP           | Start with JSONL because local hooks need simple, inspectable audit logs. Add OpenTelemetry once there is a real aggregation requirement.                                                    |
+## What NOT to Use
+| Avoid                                                                  | Why                                                                                                                                                                           | Use Instead                                                                                                           |
+| ---------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| Anthropic `server_tool_use` / native advisor-only server-side features | Project requirement is pure client-side Advisor Mode. Third-party providers generally do not expose a protocol-equivalent advisor tool.                                       | Claude Code subagents + hooks + Anthropic-compatible gateway routing.                                                 |
+| Advisor with write/execute tools                                       | Violates the read-only advisor boundary and can cause the strong model to directly mutate code or run risky commands.                                                         | `tools: Read, Grep, Glob` for advisor; executor retains `Edit`, `Write`, `Bash`.                                      |
+| Prompt-only “remember to ask advisor” policy                           | The executor can forget, skip under pressure, or fail in exactly the scenarios where advisor consultation matters.                                                            | Enforce high-risk, repeated-failure, and final-review gates with hooks.                                               |
+| Direct OpenAI-compatible endpoint without Anthropic translation        | Claude Code expects Anthropic Messages semantics, not plain OpenAI Chat Completions. Direct OpenAI-compatible endpoints can break tool/use, streaming, and error assumptions. | OpenRouter Anthropic-compatible endpoint or LiteLLM Anthropic-compatible/proxy endpoint.                              |
+| Hard-coded real model names in agent prompts                           | Makes provider swaps and budget routing brittle.                                                                                                                              | Use semantic aliases: `sonnet` for executor, `opus` for advisor, `haiku` for cheap classification/summarization.      |
+| Global-only Claude Code configuration                                  | Hard to audit and reproduce across team members.                                                                                                                              | Project-local `.claude/agents/` and `.claude/settings.json`; secrets remain in env.                                   |
+| Full MCP server as MVP control plane                                   | Adds unnecessary moving parts for an initial client-side workflow.                                                                                                            | Start with Claude Code-native hooks and local TS scripts. Add MCP later only if tools must be exposed across clients. |
+| Heavy database in MVP                                                  | The workflow mainly needs local audit logs and deterministic policy checks.                                                                                                   | JSONL files first; SQLite only if querying/reporting becomes necessary.                                               |
+| Unpinned third-party routing behavior                                  | Provider compatibility with Claude Code can drift.                                                                                                                            | Add `advisor-mode doctor` smoke tests and document supported provider/model combinations.                             |
+## Stack Patterns by Variant
+- Use Claude Code Teams + project-local `.claude/agents/` + `.claude/settings.json`.
+- Use OpenRouter as the Anthropic-compatible gateway.
+- Route `sonnet` alias to the executor model and `opus` alias to the advisor model.
+- Use TypeScript hooks with Zod validation and JSONL audit logs.
+- Because this proves advisor-mode behavior without self-hosting a gateway.
+- Use Claude Code Teams + LiteLLM Proxy.
+- Use LiteLLM virtual keys, aliases, budgets, and fallback routing.
+- Keep advisor read-only and enforce gates through hooks.
+- Add provider smoke tests in CI/local doctor command.
+- Because production rollout needs budget control, auditability, and rollback more than fastest setup.
+- Keep JSONL audit logs as the source of truth.
+- Add OpenTelemetry JS exporters for traces/metrics.
+- Export hook execution spans, advisor call latency, budget decisions, and final-review gates.
+- Because OTel is useful for aggregation, but local JSONL remains easier to debug and replay.
+- Do not enable the model in the default route.
+- Add it as an experimental alias behind `advisor-mode doctor`.
+- Test non-streaming Messages API, streaming, tool-use compatibility, long context behavior, error shape, and refusal/stop reasons.
+- Because “Anthropic-compatible” often means partial compatibility.
+## Version Compatibility
+| Package / Tool                   | Compatible With                                     | Notes                                                                                                                                                                   |
+| -------------------------------- | --------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Claude Code gateway config       | `ANTHROPIC_BASE_URL`, `ANTHROPIC_AUTH_TOKEN`        | `ANTHROPIC_AUTH_TOKEN` is used as bearer auth for gateways. Keep `ANTHROPIC_API_KEY` empty or unset when the gateway expects only its own token.                        |
+| Claude Code subagents            | `.claude/agents/*.md`, `~/.claude/agents/*.md`      | Project agents belong in `.claude/agents/`; user agents are global. For Advisor Mode, project-local is preferred for reproducibility.                                   |
+| Claude Code subagent model field | `model: sonnet`, `model: opus`, `model: haiku`      | Use semantic aliases so the gateway can route to GLM/GPT/DeepSeek/Qwen/Kimi/etc. without changing agent definitions.                                                    |
+| Claude Code hooks                | `PreToolUse`, `PostToolUse`, `Stop`, `SubagentStop` | `PreToolUse` blocks risky tools; `Stop` prevents completion without final advisor review; `SubagentStop` validates advisor output shape.                                |
+| OpenRouter                       | `ANTHROPIC_BASE_URL=https://openrouter.ai/api`      | Official OpenRouter docs say Claude Code can use its Anthropic-compatible endpoint directly. Verify exact model aliases per rollout.                                    |
+| LiteLLM                          | `base_url=http://host:4000` or `/anthropic` path    | LiteLLM docs show Anthropic SDK clients pointed at proxy base URLs and virtual keys. Claude Code official docs mention both unified and pass-through endpoint patterns. |
+| Zod 4                            | TypeScript 6.x                                      | Use `safeParse` for hook input/output and `z.toJSONSchema()` to generate prompt-visible contracts.                                                                      |
+| OpenTelemetry JS 0.218.x         | Node runtime                                        | Use `NodeSDK`, OTLP trace exporter, and OTLP metric exporter when moving beyond local logs.                                                                             |
+## Recommended MVP Stack
+## Sources
+- Context7 `/websites/code_claude` — Claude Code LLM gateway, hooks, subagents, settings.
+- Context7 `/websites/litellm_ai` — LiteLLM Anthropic-compatible proxy, virtual keys, aliases.
+- Context7 `/anthropics/anthropic-sdk-typescript` — Anthropic TypeScript SDK Messages API, streaming, tool runner.
+- Context7 `/websites/zod_dev_v4` — Zod 4 parsing and JSON Schema conversion.
+- Context7 `/open-telemetry/opentelemetry-js` — NodeSDK, OTLP traces/metrics exporters.
+- OpenRouter docs search result — Claude Code integration and Anthropic-compatible endpoint.
+- npm registry checks — current versions for TypeScript, Anthropic SDK, Claude Agent SDK, Zod, Vitest, tsx, Pino, Commander, OpenTelemetry, yaml.
+- PyPI registry check — LiteLLM 1.85.0.
+<!-- GSD:stack-end -->
+
+<!-- GSD:conventions-start source:CONVENTIONS.md -->
+## Conventions
+
+Conventions not yet established. Will populate as patterns emerge during development.
+<!-- GSD:conventions-end -->
+
+<!-- GSD:architecture-start source:ARCHITECTURE.md -->
+## Architecture
+
+Architecture not yet mapped. Follow existing patterns found in the codebase.
+<!-- GSD:architecture-end -->
+
+<!-- GSD:skills-start source:skills/ -->
+## Project Skills
+
+No project skills found. Add skills to any of: `.claude/skills/`, `.agents/skills/`, `.cursor/skills/`, `.github/skills/`, or `.codex/skills/` with a `SKILL.md` index file.
+<!-- GSD:skills-end -->
+
+<!-- GSD:workflow-start source:GSD defaults -->
+## GSD Workflow Enforcement
+
+Before using Edit, Write, or other file-changing tools, start work through a GSD command so planning artifacts and execution context stay in sync.
+
+Use these entry points:
+- `/gsd-quick` for small fixes, doc updates, and ad-hoc tasks
+- `/gsd-debug` for investigation and bug fixing
+- `/gsd-execute-phase` for planned phase work
+
+Do not make direct repo edits outside a GSD workflow unless the user explicitly asks to bypass it.
+<!-- GSD:workflow-end -->
