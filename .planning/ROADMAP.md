@@ -42,7 +42,7 @@ Plans:
 
 - [x] 01-01-PLAN.md — Create the repo-local scaffold command and Walking Skeleton assets.
 
-**Wave 2** *(blocked on Wave 1 completion)*
+**Wave 2** _(blocked on Wave 1 completion)_
 
 - [x] 01-02-PLAN.md — Validate and harden advisor/executor role boundaries.
 - [x] 01-03-PLAN.md — Document and test the versioned scaffold layout.
@@ -60,7 +60,26 @@ Plans:
 3. User can allow low-risk read-only actions to proceed without advisor escalation.
 4. User can require explicit human approval for configured critical action classes, including destructive commands, force-pushes, credential changes, and production-affecting operations.
 5. User can protect advisor policy, hook scripts, provider routes, and Claude Code configuration changes behind advisor review or human approval.
-   **Plans**: TBD
+
+**Plans:** 4 plans
+
+Plans:
+
+**Wave 1**
+
+- [ ] 02-01-PLAN.md — Verify real Claude Code runtime blocking/wait semantics and close the disposition re-entry contract before gate implementation.
+
+**Wave 2** _(blocked on Wave 1 runtime semantics)_
+
+- [ ] 02-02-PLAN.md — Implement high-risk advisor consultation with request artifacts, explicit read-only advisor recommendation producer handoff, validated recommendation artifacts, and re-entry.
+
+**Wave 3** _(blocked on Wave 2 advisor recommendation chain)_
+
+- [ ] 02-03-PLAN.md — Implement threshold-2 repeated-failure escalation plus human approval packets, persisted approve/reject/revise/defer dispositions, and re-entry validation.
+
+**Wave 4** _(blocked on Wave 3 human disposition chain)_
+
+- [ ] 02-04-PLAN.md — Protect Advisor Mode configuration surfaces with path-class-first rules using the advisor recommendation and human disposition chains.
 
 ### Phase 3: Verdict Handoff and Verification Evidence
 
@@ -111,10 +130,10 @@ Plans:
 **Execution Order:**
 Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 
-| Phase                                        | Plans Complete | Status      | Completed |
-| -------------------------------------------- | -------------- | ----------- | --------- |
-| 1. Repo-Scoped Advisor Foundation            | 4/4 | Complete   | 2026-05-19 |
-| 2. Enforced Trigger Gates                    | 0/TBD          | Not started | -         |
-| 3. Verdict Handoff and Verification Evidence | 0/TBD          | Not started | -         |
-| 4. Provider Routing and Conformance          | 0/TBD          | Not started | -         |
-| 5. Audit, Budget, and Operator Recovery      | 0/TBD          | Not started | -         |
+| Phase                                        | Plans Complete | Status      | Completed  |
+| -------------------------------------------- | -------------- | ----------- | ---------- |
+| 1. Repo-Scoped Advisor Foundation            | 4/4            | Complete    | 2026-05-19 |
+| 2. Enforced Trigger Gates                    | 0/4            | Replanned   | -          |
+| 3. Verdict Handoff and Verification Evidence | 0/TBD          | Not started | -          |
+| 4. Provider Routing and Conformance          | 0/TBD          | Not started | -          |
+| 5. Audit, Budget, and Operator Recovery      | 0/TBD          | Not started | -          |
