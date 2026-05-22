@@ -525,21 +525,7 @@ function evaluateGatePolicy(rawEvent, options = {}) {
     if (reentry.workflowGateStatus === 'satisfied') {
       return { ...decisionPacket, ...reentry, gateAction: 'allow', policyRuleId: rule.id };
     }
-    if (rule.id === 'critical-action-human-approval' && event.taskState === 'implementation') {
-      return {
-        gateAction: 'allow',
-        workflowGateStatus: 'satisfied',
-        retryRequired: true,
-        reentryAllowed: true,
-        correlationKey: paths.correlationKey,
-        requestPath: paths.requestPath,
-        recommendationPath: paths.recommendationPath,
-        policyRuleId: rule.id,
-        actionClass: classes.actionClass,
-        hookOutput: buildDecision('allow', 'Valid read-only advisor recommendation exists; explicit retry may proceed.'),
-      };
-    }
-    return { ...decisionPacket, gateAction: 'block', policyRuleId: rule.id };
+    return { ...decisionPacket, ...reentry, gateAction: 'block', policyRuleId: rule.id };
   }
 
   const readResult = readAdvisorRecommendation(paths.recommendationPath);
