@@ -61,7 +61,7 @@ Plans:
 4. User can require explicit human approval for configured critical action classes, including destructive commands, force-pushes, credential changes, and production-affecting operations, with explicit retry after a valid disposition artifact exists.
 5. User can protect advisor policy, hook scripts, provider routes, and Claude Code configuration changes behind advisor review or human approval using the same recommendation/disposition chain.
 
-**Plans:** 2/4 plans executed
+**Plans:** 3/4 plans executed
 
 Plans:
 
@@ -75,7 +75,7 @@ Plans:
 
 **Wave 3** _(blocked on Wave 2 advisor recommendation chain)_
 
-- [ ] 02-03-PLAN.md — Implement threshold-2 repeated-failure escalation plus human approval packets, persisted approve/reject/revise/defer dispositions, explicit retry, and re-entry validation.
+- [x] 02-03-PLAN.md — Implement threshold-2 repeated-failure escalation plus human approval packets, persisted approve/reject/revise/defer dispositions, explicit retry, and re-entry validation.
 
 **Wave 4** _(blocked on Wave 3 human disposition chain)_
 
@@ -133,7 +133,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | Phase                                        | Plans Complete | Status      | Completed  |
 | -------------------------------------------- | -------------- | ----------- | ---------- |
 | 1. Repo-Scoped Advisor Foundation            | 4/4            | Complete    | 2026-05-19 |
-| 2. Enforced Trigger Gates                    | 2/4 | In Progress|  |
+| 2. Enforced Trigger Gates                    | 3/4 | In Progress|  |
 | 3. Verdict Handoff and Verification Evidence | 0/TBD          | Not started | -          |
 | 4. Provider Routing and Conformance          | 0/TBD          | Not started | -          |
 | 5. Audit, Budget, and Operator Recovery      | 0/TBD          | Not started | -          |
