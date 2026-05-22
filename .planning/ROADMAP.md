@@ -14,7 +14,7 @@ Advisor Mode v1 builds a pure client-side Claude Code Teams workflow in dependen
 Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Repo-Scoped Advisor Foundation** - Maintainers can install project-local advisor assets with enforced executor/advisor role boundaries. (completed 2026-05-19)
-- [x] **Phase 2: Enforced Trigger Gates** - Users can rely on policy-driven advisor and human approval gates that host-block risky first attempts and require explicit retry after recommendation or disposition artifacts exist. (completed 2026-05-22)
+- [ ] **Phase 2: Enforced Trigger Gates** - Users can rely on policy-driven advisor and human approval gates that host-block risky first attempts and require explicit retry after recommendation or disposition artifacts exist. (gap closure planned 2026-05-22)
 - [ ] **Phase 3: Verdict Handoff and Verification Evidence** - Users receive structured advisor guidance, executor rationale, minimized context handoffs, and verification evidence.
 - [ ] **Phase 4: Provider Routing and Conformance** - Maintainers can route Claude semantic aliases to third-party models and validate provider compatibility before critical flows.
 - [ ] **Phase 5: Audit, Budget, and Operator Recovery** - Users can inspect correlated audit history, cap advisor cost/latency, validate installation, and disable enforcement safely.
@@ -61,7 +61,7 @@ Plans:
 4. User can require explicit human approval for configured critical action classes, including destructive commands, force-pushes, credential changes, and production-affecting operations, with explicit retry after a valid disposition artifact exists.
 5. User can protect advisor policy, hook scripts, provider routes, and Claude Code configuration changes behind advisor review or human approval using the same recommendation/disposition chain.
 
-**Plans:** 4/4 plans complete
+**Plans:** 4/5 plans complete; 1 gap-closure plan planned
 
 Plans:
 
@@ -80,6 +80,10 @@ Plans:
 **Wave 4** _(blocked on Wave 3 human disposition chain)_
 
 - [x] 02-04-PLAN.md — Protect Advisor Mode configuration surfaces with path-class-first rules using the advisor recommendation and human disposition plus explicit retry chains.
+
+**Wave 5** _(gap closure; blocked on Wave 4 verification gaps)_
+
+- [ ] 02-05-PLAN.md — Wire persisted repeated-failure state into `evaluateGatePolicy()`, enforce exact shared failure-signature normalization with `trackFailure()`, route critical action classes to human approval, and prove disposition retry unlocks critical/protected paths end to end.
 
 ### Phase 3: Verdict Handoff and Verification Evidence
 
@@ -130,10 +134,10 @@ Plans:
 **Execution Order:**
 Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 
-| Phase                                        | Plans Complete | Status      | Completed  |
-| -------------------------------------------- | -------------- | ----------- | ---------- |
-| 1. Repo-Scoped Advisor Foundation            | 4/4            | Complete    | 2026-05-19 |
-| 2. Enforced Trigger Gates                    | 4/4 | Complete   | 2026-05-22 |
-| 3. Verdict Handoff and Verification Evidence | 0/TBD          | Not started | -          |
-| 4. Provider Routing and Conformance          | 0/TBD          | Not started | -          |
-| 5. Audit, Budget, and Operator Recovery      | 0/TBD          | Not started | -          |
+| Phase                                        | Plans Complete | Status              | Completed  |
+| -------------------------------------------- | -------------- | ------------------- | ---------- |
+| 1. Repo-Scoped Advisor Foundation            | 4/4            | Complete            | 2026-05-19 |
+| 2. Enforced Trigger Gates                    | 4/5            | Gap closure planned | -          |
+| 3. Verdict Handoff and Verification Evidence | 0/TBD          | Not started         | -          |
+| 4. Provider Routing and Conformance          | 0/TBD          | Not started         | -          |
+| 5. Audit, Budget, and Operator Recovery      | 0/TBD          | Not started         | -          |
