@@ -32,6 +32,19 @@
         "planning-governance": { "prefixes": [".planning"] },
         "runtime-advisor-state": { "prefixes": [".advisor"] }
       },
+      "protectedSurfaces": {
+        "auditLabel": "protected-surface.review",
+        "exceptions": [".claude/advisor-mode/README.md"],
+        "classes": {
+          "advisor-policy": { "prefixes": [".claude/advisor-mode"], "patterns": ["^\\.claude/advisor-mode/.*\\.json$"] },
+          "advisor-hooks": { "prefixes": [".claude/hooks"] },
+          "claude-settings": { "files": [".claude/settings.json"] },
+          "advisor-agents": { "prefixes": [".claude/agents"] },
+          "advisor-commands": { "prefixes": [".claude/commands"] },
+          "provider-routes": { "files": [".claude/advisor-mode/provider-routes.example.json", ".claude/advisor-mode/provider-routes.json"], "prefixes": [".claude/advisor-mode/provider-routes"] },
+          "credential-controls": { "files": [".claude/advisor-mode/credentials.example.json", ".claude/advisor-mode/credential-controls.json"], "prefixes": [".claude/advisor-mode/credential-controls"] }
+        }
+      },
       "rules": [
         {
           "id": "destructive-command",
@@ -40,10 +53,20 @@
           "when": { "toolClass": "command", "actionClass": "destructive" }
         },
         {
-          "id": "advisor-governance-mutation",
-          "triggerReason": "Advisor governance surface mutation requires read-only advisor consultation before proceeding.",
+          "id": "protected-surface-human-approval",
+          "triggerReason": "Critical protected Advisor Mode surface change requires read-only advisor recommendation and human disposition.",
+          "risk": "critical",
+          "gateAction": "human-approval",
+          "auditLabel": "protected-surface.review",
+          "when": { "toolClass": "mutation", "pathClass": ["advisor-policy", "advisor-hooks", "claude-settings", "advisor-agents", "advisor-commands", "provider-routes", "credential-controls"], "taskState": ["governance-configuration", "security-boundary", "irreversible", "shared-production"] }
+        },
+        {
+          "id": "protected-surface-review",
+          "triggerReason": "Protected Advisor Mode surface mutation requires read-only advisor consultation before proceeding.",
           "risk": "high",
-          "when": { "toolClass": "mutation", "pathClass": "advisor-governance", "actionClass": ["security-boundary", "governance", "low-risk"] }
+          "gateAction": "advisor-consultation",
+          "auditLabel": "protected-surface.review",
+          "when": { "toolClass": "mutation", "pathClass": ["advisor-policy", "advisor-hooks", "claude-settings", "advisor-agents", "advisor-commands", "provider-routes", "credential-controls"], "actionClass": ["security-boundary", "governance", "low-risk"] }
         },
         {
           "id": "repeated-failure-threshold",

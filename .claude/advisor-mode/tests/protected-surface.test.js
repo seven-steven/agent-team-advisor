@@ -14,7 +14,6 @@ const {
 
 const repoRoot = path.resolve(__dirname, '..', '..', '..');
 const policy = JSON.parse(fs.readFileSync(path.join(repoRoot, '.claude/advisor-mode/policy.example.json'), 'utf8'));
-const readme = fs.readFileSync(path.join(repoRoot, '.claude/advisor-mode/README.md'), 'utf8');
 
 function makeTempRoot() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'advisor-mode-protected-'));
@@ -197,6 +196,7 @@ test('ordinary source and docs edits do not escalate solely because they mutate 
 });
 
 test('README documents protected surface operational chain', () => {
+  const readme = fs.readFileSync(path.join(repoRoot, '.claude/advisor-mode/README.md'), 'utf8');
   assert.match(readme, /host permissions/i);
   assert.match(readme, /workflow gates/i);
   assert.match(readme, /read-only `advisor-reviewer`/);

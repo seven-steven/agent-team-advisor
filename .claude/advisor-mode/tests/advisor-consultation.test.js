@@ -179,7 +179,7 @@ test('policy evaluation combines tool path action failure count and task state d
 
   assert.equal(gate.classifyToolClass('Bash', { command: 'git push --force origin main' }, policy), 'command');
   assert.equal(gate.classifyActionClass('Bash', { command: 'git push --force origin main' }, policy), 'destructive');
-  assert.equal(gate.classifyPathClass('Edit', { file_path: '.claude/settings.json' }, policy), 'advisor-governance');
+  assert.equal(gate.classifyPathClass('Edit', { file_path: '.claude/settings.json' }, policy), 'claude-settings');
 
   const failureResult = gate.evaluateGatePolicy(
     {
