@@ -23,7 +23,10 @@
         "mutation": { "tools": ["Edit", "Write", "MultiEdit"] }
       },
       "actionClasses": {
-        "destructive": { "commandPatterns": ["\\brm\\s+-rf\\b", "\\bgit\\s+push\\s+--force\\b", "\\bgit\\s+reset\\s+--hard\\b", "\\bgit\\s+clean\\b"] },
+        "destructive": { "commandPatterns": ["\\brm\\s+-rf\\b", "\\bgit\\s+push\\s+(?:[^\\n;&|]*\\s)?(?:--force|-f)\\b", "\\bgit\\s+reset\\s+--hard\\b", "\\bgit\\s+clean\\b"] },
+        "force-push": { "commandPatterns": ["\\bgit\\s+push\\s+(?:[^\\n;&|]*\\s)?(?:--force|-f)\\b"] },
+        "credential-control": { "pathPatterns": ["(^|/)\\.claude/advisor-mode/(credentials|credential-controls)(\\.example)?\\.json$", "(^|/)\\.env(\\.|$)"] },
+        "production-affecting": { "commandPatterns": ["\\b(kubectl|terraform|pulumi)\\b.*\\b(production|prod)\\b", "\\bdeploy\\b.*\\b(production|prod)\\b"] },
         "security-boundary": { "pathPatterns": ["(^|/)\\.claude/(agents|hooks|settings\\.json)", "(^|/)\\.advisor/"] },
         "governance": { "pathPatterns": ["(^|/)\\.claude/advisor-mode/.*\\.json$", "(^|/)\\.planning/"] }
       },
@@ -47,10 +50,17 @@
       },
       "rules": [
         {
-          "id": "destructive-command",
-          "triggerReason": "Destructive command requires read-only advisor consultation before proceeding.",
+          "id": "repeated-failure-threshold",
+          "triggerReason": "Repeated verification failure requires read-only advisor consultation before continuing.",
+          "risk": "high",
+          "when": { "toolClass": "command", "taskState": "verification", "failureCountAtLeast": 2 }
+        },
+        {
+          "id": "critical-action-human-approval",
+          "triggerReason": "Critical action class requires read-only advisor recommendation and human disposition before proceeding.",
           "risk": "critical",
-          "when": { "toolClass": "command", "actionClass": "destructive" }
+          "gateAction": "human-approval",
+          "when": { "toolClass": ["command", "mutation"], "actionClass": ["destructive", "force-push", "credential-control", "production-affecting"] }
         },
         {
           "id": "protected-surface-human-approval",
@@ -67,12 +77,6 @@
           "gateAction": "advisor-consultation",
           "auditLabel": "protected-surface.review",
           "when": { "toolClass": "mutation", "pathClass": ["advisor-policy", "advisor-hooks", "claude-settings", "advisor-agents", "advisor-commands", "provider-routes", "credential-controls"], "actionClass": ["security-boundary", "governance", "low-risk"] }
-        },
-        {
-          "id": "repeated-failure-threshold",
-          "triggerReason": "Repeated verification failure requires read-only advisor consultation before continuing.",
-          "risk": "high",
-          "when": { "toolClass": "command", "taskState": "verification", "failureCountAtLeast": 2 }
         }
       ]
     },

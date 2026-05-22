@@ -136,6 +136,40 @@ test('critical protected changes require advisor recommendation before human pac
   assert.match(packet.dispositionPath, /\.advisor\/decisions\/dispositions\/advisor-consultation-/);
 });
 
+test('evaluateGatePolicy unlocks protected human approval retry after disposition', () => {
+  const root = makeTempRoot();
+  const event = {
+    toolName: 'Edit',
+    toolInput: { file_path: '.claude/hooks/advisor-gate.js' },
+    taskState: 'governance-configuration',
+  };
+  const first = evaluateGatePolicy(event, { root, policy });
+  assert.equal(first.workflowGateStatus, 'blocked-pending-advisor');
+  assert.equal(first.policyRuleId, 'protected-surface-human-approval');
+  writeRecommendation(first.recommendationPath, readJson(first.requestPath));
+
+  const packet = evaluateGatePolicy(event, { root, policy });
+  assert.equal(packet.event, 'human_approval.required');
+  assert.equal(packet.workflowGateStatus, 'blocked-pending-human');
+
+  writeDisposition(
+    {
+      correlationKey: packet.correlationKey,
+      disposition: 'approve',
+      decidedBy: 'human-operator',
+      rationale: 'Approved protected surface retry.',
+      appliesTo: { event: packet.event },
+    },
+    { root },
+  );
+  const retry = evaluateGatePolicy(event, { root, policy });
+  assert.equal(retry.gateAction, 'allow');
+  assert.equal(retry.workflowGateStatus, 'satisfied');
+  assert.equal(retry.reentryAllowed, true);
+  assert.equal(retry.disposition, 'approve');
+  assert.equal(retry.auditLabel, 'protected-surface.review');
+});
+
 test('critical protected re-entry requires matching approve reject revise or defer disposition', () => {
   const root = makeTempRoot();
   const blocked = buildDecisionPacket(

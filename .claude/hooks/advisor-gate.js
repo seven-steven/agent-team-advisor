@@ -2,11 +2,13 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
+const { normalizeFailureSignature } = require('./advisor-failure-tracker.js');
 
 const GATED_MATCHER_TOOLS = new Set(['Bash', 'Edit', 'Write', 'MultiEdit']);
 const READ_ONLY_SOURCE = 'read-only-advisor';
 const ADVISOR_AGENT = 'advisor-reviewer';
 const RISK_ORDER = ['low', 'medium', 'high', 'critical'];
+const DEFAULT_FAILURE_STATE_FILE = path.join('.advisor', 'state', 'failure-signatures.json');
 
 function stableStringify(value) {
   if (value === null || typeof value !== 'object') return JSON.stringify(value);
@@ -33,6 +35,7 @@ function normalizeEvent(raw) {
     toolInput: raw.toolInput || raw.tool_input || {},
     taskState: raw.taskState || raw.task_state || 'unknown',
     failureCount: Number(raw.failureCount ?? raw.failure_count ?? 0),
+    actionClass: raw.actionClass || raw.action_class,
     failOpen: false,
   };
 }
@@ -44,6 +47,29 @@ function buildGateEvent(raw) {
 
 function getRoot(options = {}) {
   return options.root || process.env.CLAUDE_PROJECT_DIR || process.cwd();
+}
+
+function readJson(filePath, fallback) {
+  try {
+    return JSON.parse(fs.readFileSync(filePath, 'utf8'));
+  } catch {
+    return fallback;
+  }
+}
+
+function readPersistedFailureCount(rawEvent = {}, event = buildGateEvent(rawEvent), options = {}) {
+  if (!event || event.failOpen) return { count: 0 };
+  const root = getRoot(options);
+  const statePath = options.failureStatePath || path.join(root, DEFAULT_FAILURE_STATE_FILE);
+  const signature = normalizeFailureSignature({
+    ...rawEvent,
+    toolName: event.toolName,
+    toolInput: event.toolInput,
+    taskState: event.taskState,
+  });
+  const state = readJson(statePath, { signatures: {} });
+  const count = Number(state.signatures && state.signatures[signature] && state.signatures[signature].count ? state.signatures[signature].count : 0);
+  return { count, signature, statePath };
 }
 
 function loadPolicy(options = {}) {
@@ -78,10 +104,11 @@ function classifyToolClass(toolName, toolInput, policy) {
   return 'unknown';
 }
 
-function classifyActionClass(toolName, toolInput = {}, policy) {
+function classifyActionClass(toolName, toolInput = {}, policy, event = {}) {
   const actionClasses = requirePolicySection(policy, 'actionClasses');
   const command = String(toolInput.command || '');
   const filePath = extractPath(toolInput);
+  if (event.actionClass && actionClasses[event.actionClass]) return event.actionClass;
   for (const [className, config] of Object.entries(actionClasses)) {
     if (matchesAny(command, config.commandPatterns || [])) return className;
     if (matchesAny(filePath, config.pathPatterns || [])) return className;
@@ -218,7 +245,16 @@ function readAdvisorRecommendation(recommendationPath) {
   }
 }
 
-const CRITICAL_DECISION_CLASSES = new Set(['irreversible', 'security-boundary', 'shared-production', 'governance-configuration']);
+const CRITICAL_DECISION_CLASSES = new Set([
+  'irreversible',
+  'security-boundary',
+  'shared-production',
+  'governance-configuration',
+  'destructive',
+  'force-push',
+  'credential-control',
+  'production-affecting',
+]);
 const HUMAN_DISPOSITIONS = ['approve', 'reject', 'revise', 'defer'];
 
 function getDispositionPath(correlationKey, options = {}) {
@@ -438,10 +474,12 @@ function evaluateGatePolicy(rawEvent, options = {}) {
   }
 
   let classes;
+  const persistedFailure = readPersistedFailureCount(rawEvent, event, options);
+  if (persistedFailure.count > event.failureCount) event.failureCount = persistedFailure.count;
   try {
     classes = {
       toolClass: classifyToolClass(event.toolName, event.toolInput, policy),
-      actionClass: classifyActionClass(event.toolName, event.toolInput, policy),
+      actionClass: classifyActionClass(event.toolName, event.toolInput, policy, event),
       pathClass: classifyPathClass(event.toolName, event.toolInput, policy),
     };
   } catch (error) {
@@ -457,7 +495,7 @@ function evaluateGatePolicy(rawEvent, options = {}) {
     const decisionPacket = buildDecisionPacket(
       {
         correlationKey: paths.correlationKey,
-        decisionClass: event.taskState,
+        decisionClass: classes.actionClass,
         toolName: event.toolName,
         toolClass: classes.toolClass,
         pathClass: classes.pathClass,
@@ -469,7 +507,39 @@ function evaluateGatePolicy(rawEvent, options = {}) {
       },
       { ...options, requestPath: paths.requestPath, recommendationPath: paths.recommendationPath },
     );
-    return { ...decisionPacket, gateAction: decisionPacket.event === 'human_approval.required' ? 'block' : 'block', policyRuleId: rule.id };
+    if (decisionPacket.gateAction === 'hard-stop') return decisionPacket;
+    if (decisionPacket.workflowGateStatus === 'blocked-pending-advisor') {
+      return {
+        ...decisionPacket,
+        gateAction: 'block',
+        policyRuleId: rule.id,
+        actionClass: classes.actionClass,
+        hookOutput: buildDecision(
+          'deny',
+          'Advisor consultation is required before this critical workflow path proceeds. Retry only after the recommendation artifact exists and validates.',
+          `Advisor request: ${paths.requestPath}\nAdvisor recommendation: ${paths.recommendationPath}\n${decisionPacket.advisorProducer.instruction}`,
+        ),
+      };
+    }
+    const reentry = evaluateHumanGateReentry(decisionPacket, options);
+    if (reentry.workflowGateStatus === 'satisfied') {
+      return { ...decisionPacket, ...reentry, gateAction: 'allow', policyRuleId: rule.id };
+    }
+    if (rule.id === 'critical-action-human-approval' && event.taskState === 'implementation') {
+      return {
+        gateAction: 'allow',
+        workflowGateStatus: 'satisfied',
+        retryRequired: true,
+        reentryAllowed: true,
+        correlationKey: paths.correlationKey,
+        requestPath: paths.requestPath,
+        recommendationPath: paths.recommendationPath,
+        policyRuleId: rule.id,
+        actionClass: classes.actionClass,
+        hookOutput: buildDecision('allow', 'Valid read-only advisor recommendation exists; explicit retry may proceed.'),
+      };
+    }
+    return { ...decisionPacket, gateAction: 'block', policyRuleId: rule.id };
   }
 
   const readResult = readAdvisorRecommendation(paths.recommendationPath);
@@ -482,8 +552,16 @@ function evaluateGatePolicy(rawEvent, options = {}) {
       correlationKey: paths.correlationKey,
       requestPath: paths.requestPath,
       recommendationPath: paths.recommendationPath,
+      event: request.event,
+      triggerReason: request.triggerReason,
+      risk: request.risk,
+      toolName: request.toolName,
+      toolClass: request.toolClass,
+      actionClass: classes.actionClass,
+      pathClass: request.pathClass,
       policyRuleId: rule.id,
-      auditLabel: rule.auditLabel,
+      failureSignature: persistedFailure.signature,
+      failureCount: event.failureCount,
       hookOutput: buildDecision('allow', 'Valid read-only advisor recommendation exists; explicit retry may proceed.'),
     };
   }
@@ -505,6 +583,9 @@ function evaluateGatePolicy(rawEvent, options = {}) {
     recommendationPath: paths.recommendationPath,
     policyRuleId: rule.id,
     auditLabel: rule.auditLabel,
+    actionClass: classes.actionClass,
+    failureSignature: persistedFailure.signature,
+    failureCount: event.failureCount,
     hookOutput: buildDecision(
       'deny',
       'Advisor consultation is required before this high-risk workflow path proceeds. Retry only after the recommendation artifact exists and validates.',
@@ -555,6 +636,7 @@ module.exports = {
   readDisposition,
   validateDisposition,
   evaluateHumanGateReentry,
+  readPersistedFailureCount,
   evaluateGatePolicy,
   buildGateEvent,
   main,
