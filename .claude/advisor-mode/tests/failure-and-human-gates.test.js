@@ -148,6 +148,36 @@ test('failure normalization strips volatile data while preserving material class
   assert.doesNotMatch(a, /home|var|2026|2027|aaaaaaaa|bbbbbbbb|12345|67890|:10|:987/);
 });
 
+test('evaluateGatePolicy reads persisted repeated failure state using tracker signature key', () => {
+  const root = makeTempRoot('advisor-failure-evaluate-');
+  const payload = failurePayload();
+  failureTracker.trackFailure(payload, { root });
+  const tracked = failureTracker.trackFailure(payload, { root });
+  const trackerSignature = failureTracker.normalizeFailureSignature(payload);
+
+  assert.equal(tracked.signature, trackerSignature);
+  const state = JSON.parse(fs.readFileSync(path.join(root, '.advisor', 'state', 'failure-signatures.json'), 'utf8'));
+  assert.equal(state.signatures[trackerSignature].count, 2);
+
+  const result = gate.evaluateGatePolicy(
+    {
+      hookEventName: 'PreToolUse',
+      toolName: payload.toolName,
+      toolInput: payload.toolInput,
+      toolResponse: payload.toolResponse,
+      taskState: payload.taskState,
+      actionClass: payload.actionClass,
+    },
+    { root },
+  );
+
+  assert.equal(result.event, 'advisor_consultation.required');
+  assert.equal(result.workflowGateStatus, 'blocked-pending-advisor');
+  assert.equal(result.policyRuleId, 'repeated-failure-threshold');
+  assert.equal(result.failureSignature, trackerSignature);
+  assert.equal(result.failureCount, 2);
+});
+
 test('critical D-10 classes emit human approval only after matching advisor recommendation exists', () => {
   const root = makeTempRoot();
   for (const decisionClass of d10DecisionClasses) {
@@ -168,6 +198,66 @@ test('critical D-10 classes emit human approval only after matching advisor reco
     assert.equal(packet.reentryAllowed, false);
     assert.equal(packet.decisionClass, decisionClass);
     assert.equal(packet.advisorRecommendation.correlationKey, input.correlationKey);
+  }
+});
+
+test('evaluateGatePolicy routes destructive force-push credential and production actions to human approval retry', () => {
+  const root = makeTempRoot('advisor-critical-evaluate-');
+  const cases = [
+    {
+      name: 'destructive',
+      event: { toolName: 'Bash', toolInput: { command: 'rm -rf ./dist' }, taskState: 'irreversible' },
+      expectedActionClass: 'destructive',
+    },
+    {
+      name: 'force-push',
+      event: { toolName: 'Bash', toolInput: { command: 'git push --force origin main' }, taskState: 'irreversible' },
+      expectedActionClass: 'force-push',
+    },
+    {
+      name: 'credential',
+      event: { toolName: 'Edit', toolInput: { file_path: '.claude/advisor-mode/credentials.example.json' }, taskState: 'security-boundary' },
+      expectedActionClass: 'credential-control',
+    },
+    {
+      name: 'production',
+      event: { toolName: 'Bash', toolInput: { command: 'kubectl apply -f production.yaml' }, taskState: 'shared-production' },
+      expectedActionClass: 'production-affecting',
+    },
+  ];
+
+  for (const testCase of cases) {
+    const first = gate.evaluateGatePolicy(testCase.event, { root });
+    assert.equal(first.event, 'advisor_consultation.required', testCase.name);
+    assert.equal(first.workflowGateStatus, 'blocked-pending-advisor', testCase.name);
+    assert.equal(first.actionClass, testCase.expectedActionClass, testCase.name);
+
+    writeRecommendation(
+      root,
+      { correlationKey: first.correlationKey, riskLevel: first.risk, decisionClass: first.actionClass },
+      validRecommendation({ correlationKey: first.correlationKey, riskLevel: first.risk }, first.requestPath),
+    );
+    const packet = gate.evaluateGatePolicy(testCase.event, { root });
+    assert.equal(packet.event, 'human_approval.required', testCase.name);
+    assert.equal(packet.workflowGateStatus, 'blocked-pending-human', testCase.name);
+
+    for (const disposition of d13Dispositions) {
+      gate.writeDisposition(
+        {
+          correlationKey: packet.correlationKey,
+          disposition,
+          decidedBy: 'human-operator',
+          rationale: `${disposition} ${testCase.name}`,
+          appliesTo: { event: packet.event },
+        },
+        { root },
+      );
+      const retry = gate.evaluateGatePolicy(testCase.event, { root });
+      assert.equal(retry.gateAction, 'allow', testCase.name);
+      assert.equal(retry.workflowGateStatus, 'satisfied', testCase.name);
+      assert.equal(retry.reentryAllowed, true, testCase.name);
+      assert.equal(retry.disposition, disposition, testCase.name);
+    }
   }
 });
 
