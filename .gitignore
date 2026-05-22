@@ -2,5 +2,9 @@
 !.advisor/audit/.gitkeep
 .advisor/state/*.json
 !.advisor/state/.gitkeep
+.advisor/consultations/requests/*.json
+!.advisor/consultations/requests/.gitkeep
+.advisor/consultations/recommendations/*.json
+!.advisor/consultations/recommendations/.gitkeep
 .claude/node_modules/
 .claude/worktrees/

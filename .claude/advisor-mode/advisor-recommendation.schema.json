@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Advisor Mode Recommendation",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "correlationKey",
+    "source",
+    "advisorAgent",
+    "status",
+    "risk",
+    "confidence",
+    "recommendation",
+    "rationale",
+    "blockingFindings",
+    "recommendedActions",
+    "verificationGuidance",
+    "requestPath"
+  ],
+  "properties": {
+    "correlationKey": { "type": "string", "pattern": "^advisor-consultation-[a-f0-9]{24}$" },
+    "source": { "type": "string", "const": "read-only-advisor" },
+    "advisorAgent": { "type": "string", "const": "advisor-reviewer" },
+    "status": { "type": "string", "enum": ["PASS", "CONCERNS", "FAIL", "BLOCKED"] },
+    "risk": { "type": "string", "enum": ["low", "medium", "high", "critical"] },
+    "confidence": { "type": "string", "enum": ["low", "medium", "high"] },
+    "recommendation": { "type": "string", "minLength": 1 },
+    "rationale": { "type": "string", "minLength": 1 },
+    "blockingFindings": { "type": "array", "items": { "type": "string" } },
+    "recommendedActions": { "type": "array", "items": { "type": "string" } },
+    "verificationGuidance": { "type": "array", "items": { "type": "string" } },
+    "requestPath": { "type": "string", "minLength": 1 }
+  }
+}

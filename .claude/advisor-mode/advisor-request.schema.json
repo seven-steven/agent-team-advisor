@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Advisor Mode Consultation Request",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "correlationKey",
+    "event",
+    "triggerReason",
+    "risk",
+    "toolName",
+    "toolClass",
+    "actionClass",
+    "pathClass",
+    "policyRuleId",
+    "consultationTiming",
+    "requestPath",
+    "recommendationPath",
+    "advisorProducer"
+  ],
+  "properties": {
+    "correlationKey": { "type": "string", "pattern": "^advisor-consultation-[a-f0-9]{24}$" },
+    "event": { "type": "string", "const": "advisor_consultation.required" },
+    "triggerReason": { "type": "string", "minLength": 1 },
+    "risk": { "type": "string", "enum": ["medium", "high", "critical"] },
+    "toolName": { "type": "string", "enum": ["Bash", "Edit", "Write", "MultiEdit"] },
+    "toolClass": { "type": "string", "minLength": 1 },
+    "actionClass": { "type": "string", "minLength": 1 },
+    "pathClass": { "type": "string", "minLength": 1 },
+    "policyRuleId": { "type": "string", "minLength": 1 },
+    "consultationTiming": { "type": "string", "const": "before-proceed" },
+    "requestPath": { "type": "string", "minLength": 1 },
+    "recommendationPath": { "type": "string", "minLength": 1 },
+    "advisorProducer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["surface", "agent", "inputPath", "outputPath", "instruction"],
+      "properties": {
+        "surface": { "type": "string", "enum": ["subagent-or-SendMessage"] },
+        "agent": { "type": "string", "const": "advisor-reviewer" },
+        "inputPath": { "type": "string", "minLength": 1 },
+        "outputPath": { "type": "string", "minLength": 1 },
+        "instruction": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}

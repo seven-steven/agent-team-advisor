@@ -16,6 +16,43 @@
         "executor.followup.recorded"
       ]
     },
+    "gates": {
+      "failureThreshold": 2,
+      "toolClasses": {
+        "command": { "tools": ["Bash"] },
+        "mutation": { "tools": ["Edit", "Write", "MultiEdit"] }
+      },
+      "actionClasses": {
+        "destructive": { "commandPatterns": ["\\brm\\s+-rf\\b", "\\bgit\\s+push\\s+--force\\b", "\\bgit\\s+reset\\s+--hard\\b", "\\bgit\\s+clean\\b"] },
+        "security-boundary": { "pathPatterns": ["(^|/)\\.claude/(agents|hooks|settings\\.json)", "(^|/)\\.advisor/"] },
+        "governance": { "pathPatterns": ["(^|/)\\.claude/advisor-mode/.*\\.json$", "(^|/)\\.planning/"] }
+      },
+      "pathClasses": {
+        "advisor-governance": { "prefixes": [".claude/advisor-mode", ".claude/hooks", ".claude/agents"], "files": [".claude/settings.json"] },
+        "planning-governance": { "prefixes": [".planning"] },
+        "runtime-advisor-state": { "prefixes": [".advisor"] }
+      },
+      "rules": [
+        {
+          "id": "destructive-command",
+          "triggerReason": "Destructive command requires read-only advisor consultation before proceeding.",
+          "risk": "critical",
+          "when": { "toolClass": "command", "actionClass": "destructive" }
+        },
+        {
+          "id": "advisor-governance-mutation",
+          "triggerReason": "Advisor governance surface mutation requires read-only advisor consultation before proceeding.",
+          "risk": "high",
+          "when": { "toolClass": "mutation", "pathClass": "advisor-governance", "actionClass": ["security-boundary", "governance", "low-risk"] }
+        },
+        {
+          "id": "repeated-failure-threshold",
+          "triggerReason": "Repeated verification failure requires read-only advisor consultation before continuing.",
+          "risk": "high",
+          "when": { "toolClass": "command", "taskState": "verification", "failureCountAtLeast": 2 }
+        }
+      ]
+    },
     "phase1": {
       "installsExternalPackages": false,
       "hooksFailOpen": true
