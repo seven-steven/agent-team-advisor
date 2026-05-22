@@ -5,6 +5,7 @@ const os = require('node:os');
 const path = require('node:path');
 
 const gate = require('../../hooks/advisor-gate.js');
+const settingsPath = path.resolve(__dirname, '..', '..', 'settings.json');
 
 function makeTempRoot() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'advisor-consultation-'));
@@ -67,6 +68,12 @@ function validRecommendation(request, overrides = {}) {
 function writeJson(filePath, value) {
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
   fs.writeFileSync(filePath, JSON.stringify(value, null, 2) + '\n');
+}
+
+function allHookCommands(settings, eventName) {
+  return (settings.hooks[eventName] || []).flatMap((entry) =>
+    (entry.hooks || []).map((hook) => ({ matcher: entry.matcher || '', command: hook.command || '' })),
+  );
 }
 
 test('high-risk configured tools block first attempt and create deterministic consultation paths', () => {
@@ -230,4 +237,21 @@ test('request artifact write failure hard-stops with stable request-write-failed
   assert.equal(result.gateAction, 'hard-stop');
   assert.equal(result.reasonCode, 'request-write-failed');
   assert.equal(result.hookOutput.hookSpecificOutput.permissionDecision, 'deny');
+});
+
+test('settings wires exactly one advisor gate PreToolUse matcher and preserves existing hooks', () => {
+  const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
+  const preToolCommands = allHookCommands(settings, 'PreToolUse');
+  const postToolCommands = allHookCommands(settings, 'PostToolUse');
+  const advisorGateCommands = preToolCommands.filter(({ command }) => command.includes('advisor-gate.js'));
+
+  assert.equal(advisorGateCommands.length, 1);
+  assert.equal(advisorGateCommands[0].matcher, 'Bash|Edit|Write|MultiEdit');
+  assert.doesNotMatch(advisorGateCommands[0].matcher, /Read/);
+  assert.equal(preToolCommands.some(({ command }) => command.includes('advisor-boundary-check.js')), true);
+  assert.equal(preToolCommands.some(({ command }) => command.includes('gsd-prompt-guard.js')), true);
+  assert.equal(preToolCommands.some(({ command }) => command.includes('gsd-read-guard.js')), true);
+  assert.equal(preToolCommands.some(({ command }) => command.includes('gsd-workflow-guard.js')), true);
+  assert.equal(postToolCommands.some(({ command }) => command.includes('advisor-install-audit.js')), true);
+  assert.equal(postToolCommands.some(({ command }) => command.includes('gsd-context-monitor.js')), true);
 });
