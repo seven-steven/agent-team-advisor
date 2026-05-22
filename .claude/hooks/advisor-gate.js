@@ -199,6 +199,21 @@ function readAdvisorRecommendation(recommendationPath) {
   }
 }
 
+const CRITICAL_DECISION_CLASSES = new Set(['irreversible', 'security-boundary', 'shared-production', 'governance-configuration']);
+const HUMAN_DISPOSITIONS = ['approve', 'reject', 'revise', 'defer'];
+
+function getDispositionPath(correlationKey, options = {}) {
+  return options.dispositionPath || path.join(getRoot(options), '.advisor', 'decisions', 'dispositions', `${correlationKey}.json`);
+}
+
+function getHumanRecommendationPath(correlationKey, options = {}) {
+  return options.recommendationPath || path.join(getRoot(options), '.advisor', 'consultations', 'recommendations', `${correlationKey}.json`);
+}
+
+function getHumanRequestPath(correlationKey, options = {}) {
+  return options.requestPath || path.join(getRoot(options), '.advisor', 'consultations', 'requests', `${correlationKey}.json`);
+}
+
 function isString(value) {
   return typeof value === 'string' && value.trim().length > 0;
 }
@@ -243,6 +258,138 @@ function buildDecision(permissionDecision, reason, additionalContext) {
   };
   if (additionalContext) output.hookSpecificOutput.additionalContext = additionalContext;
   return output;
+}
+
+function buildDecisionPacket(input = {}, options = {}) {
+  const correlationKey = input.correlationKey || buildCorrelationKey({
+    hookEventName: 'HumanApproval',
+    toolName: input.decisionClass || 'human-decision',
+    toolInput: { decisionSummary: input.decisionSummary || '' },
+    taskState: 'human-approval',
+  });
+  const decisionClass = input.decisionClass || input.actionClass || 'unknown';
+  const requestPath = getHumanRequestPath(correlationKey, options);
+  const recommendationPath = getHumanRecommendationPath(correlationKey, options);
+  const dispositionPath = getDispositionPath(correlationKey, options);
+  const request = {
+    correlationKey,
+    event: 'advisor_consultation.required',
+    triggerReason: input.triggerReason || 'Critical human decision requires read-only advisor recommendation first.',
+    risk: input.riskLevel || input.risk || 'critical',
+    toolName: input.toolName || 'workflow-decision',
+    toolClass: input.toolClass || 'workflow',
+    actionClass: decisionClass,
+    pathClass: input.pathClass || 'none',
+    policyRuleId: input.policyRuleId || 'human-critical-decision',
+    consultationTiming: 'before-proceed',
+    requestPath,
+    recommendationPath,
+    advisorProducer: buildAdvisorProducerInstruction(requestPath, recommendationPath),
+  };
+
+  const readResult = readAdvisorRecommendation(recommendationPath);
+  if (!readResult.ok || !validateAdvisorRecommendation(readResult.recommendation, request)) {
+    try {
+      writeConsultationRequest(request);
+    } catch {
+      return hardStop('request-write-failed', 'Advisor Mode consultation request could not be written; blocking human decision gate.');
+    }
+    return {
+      ...request,
+      workflowGateStatus: 'blocked-pending-advisor',
+      retryRequired: true,
+      reentryAllowed: false,
+      reasonCode: readResult.reasonCode || 'invalid-recommendation-artifact',
+    };
+  }
+
+  if (!CRITICAL_DECISION_CLASSES.has(decisionClass)) {
+    return { gateAction: 'none', reasonCode: 'non-critical-decision-class', correlationKey };
+  }
+
+  return {
+    correlationKey,
+    event: 'human_approval.required',
+    triggerReason: request.triggerReason,
+    decisionSummary: input.decisionSummary || request.triggerReason,
+    decisionClass,
+    riskLevel: request.risk,
+    options: HUMAN_DISPOSITIONS.map((disposition) => ({
+      disposition,
+      label: disposition,
+      requiresExplicitRetry: true,
+    })),
+    advisorRecommendation: readResult.recommendation,
+    expectedConsequences: Array.isArray(input.expectedConsequences) ? input.expectedConsequences : [],
+    suggestedVerificationPoints: Array.isArray(input.suggestedVerificationPoints) ? input.suggestedVerificationPoints : [],
+    workflowGateStatus: 'blocked-pending-human',
+    dispositionPath,
+    retryRequired: true,
+    reentryAllowed: false,
+    requiresExplicitRetry: true,
+    hostWaitAndResume: false,
+  };
+}
+
+function writeDisposition(dispositionInput = {}, options = {}) {
+  const correlationKey = dispositionInput.correlationKey;
+  const artifactPath = getDispositionPath(correlationKey, options);
+  const artifact = {
+    correlationKey,
+    event: 'human_approval.disposition',
+    disposition: dispositionInput.disposition,
+    decidedBy: dispositionInput.decidedBy,
+    decidedAt: dispositionInput.decidedAt || new Date().toISOString(),
+    rationale: dispositionInput.rationale,
+    appliesTo: dispositionInput.appliesTo,
+  };
+  if (Array.isArray(dispositionInput.conditions)) artifact.conditions = dispositionInput.conditions;
+  fs.mkdirSync(path.dirname(artifactPath), { recursive: true });
+  fs.writeFileSync(artifactPath, `${JSON.stringify(artifact, null, 2)}\n`);
+  return { ...artifact, path: artifactPath };
+}
+
+function readDisposition(correlationKey, options = {}) {
+  const dispositionPath = getDispositionPath(correlationKey, options);
+  try {
+    return { ok: true, disposition: JSON.parse(fs.readFileSync(dispositionPath, 'utf8')), path: dispositionPath };
+  } catch (error) {
+    return { ok: false, reasonCode: error.code === 'ENOENT' ? 'missing-disposition' : 'invalid-disposition-json', path: dispositionPath };
+  }
+}
+
+function validateDisposition(disposition, packet) {
+  if (!disposition || typeof disposition !== 'object' || Array.isArray(disposition)) return false;
+  if (disposition.correlationKey !== packet.correlationKey) return false;
+  if (disposition.event !== 'human_approval.disposition') return false;
+  if (!HUMAN_DISPOSITIONS.includes(disposition.disposition)) return false;
+  if (!isString(disposition.decidedBy) || !isString(disposition.decidedAt) || !isString(disposition.rationale)) return false;
+  if (!disposition.appliesTo || disposition.appliesTo.event !== packet.event) return false;
+  if (disposition.conditions !== undefined && !Array.isArray(disposition.conditions)) return false;
+  return true;
+}
+
+function evaluateHumanGateReentry(packet = {}, options = {}) {
+  const correlationKey = packet.correlationKey;
+  const readResult = readDisposition(correlationKey, { ...options, dispositionPath: options.dispositionPath || packet.dispositionPath });
+  const base = {
+    correlationKey,
+    workflowGateStatus: 'blocked-pending-human',
+    retryRequired: true,
+    reentryAllowed: false,
+    requiresExplicitRetry: true,
+    hostWaitAndResume: false,
+    dispositionPath: readResult.path,
+  };
+  if (!readResult.ok) return { ...base, reasonCode: readResult.reasonCode };
+  if (!validateDisposition(readResult.disposition, packet)) return { ...base, reasonCode: 'invalid-disposition-artifact' };
+  return {
+    ...base,
+    workflowGateStatus: 'satisfied',
+    reentryAllowed: true,
+    disposition: readResult.disposition.disposition,
+    reasonCode: 'valid-disposition',
+  };
 }
 
 function hardStop(reasonCode, message) {
@@ -360,6 +507,11 @@ module.exports = {
   readAdvisorRecommendation,
   buildAdvisorProducerInstruction,
   validateAdvisorRecommendation,
+  buildDecisionPacket,
+  writeDisposition,
+  readDisposition,
+  validateDisposition,
+  evaluateHumanGateReentry,
   evaluateGatePolicy,
   buildGateEvent,
   main,

@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Advisor Mode Human Approval Decision Packet",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "correlationKey",
+    "event",
+    "triggerReason",
+    "decisionSummary",
+    "riskLevel",
+    "options",
+    "advisorRecommendation",
+    "expectedConsequences",
+    "suggestedVerificationPoints",
+    "workflowGateStatus",
+    "dispositionPath",
+    "retryRequired"
+  ],
+  "properties": {
+    "correlationKey": { "type": "string", "minLength": 1 },
+    "event": { "type": "string", "const": "human_approval.required" },
+    "triggerReason": { "type": "string", "minLength": 1 },
+    "decisionSummary": { "type": "string", "minLength": 1 },
+    "decisionClass": { "type": "string", "enum": ["irreversible", "security-boundary", "shared-production", "governance-configuration"] },
+    "riskLevel": { "type": "string", "enum": ["high", "critical"] },
+    "options": {
+      "type": "array",
+      "minItems": 4,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["disposition", "label", "requiresExplicitRetry"],
+        "properties": {
+          "disposition": { "type": "string", "enum": ["approve", "reject", "revise", "defer"] },
+          "label": { "type": "string", "minLength": 1 },
+          "requiresExplicitRetry": { "type": "boolean", "const": true }
+        }
+      }
+    },
+    "advisorRecommendation": { "$ref": "advisor-recommendation.schema.json" },
+    "expectedConsequences": { "type": "array", "items": { "type": "string" } },
+    "suggestedVerificationPoints": { "type": "array", "items": { "type": "string" } },
+    "workflowGateStatus": { "type": "string", "const": "blocked-pending-human" },
+    "dispositionPath": { "type": "string", "minLength": 1 },
+    "retryRequired": { "type": "boolean", "const": true },
+    "reentryAllowed": { "type": "boolean", "const": false },
+    "requiresExplicitRetry": { "type": "boolean", "const": true },
+    "hostWaitAndResume": { "type": "boolean", "const": false }
+  }
+}

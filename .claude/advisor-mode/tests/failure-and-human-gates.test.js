@@ -119,24 +119,24 @@ test('two identical normalized failures escalate at threshold 2 and require advi
 test('failure normalization strips volatile data while preserving material classes', () => {
   const a = failureTracker.normalizeFailureSignature(
     failurePayload({
-      tool_response: {
-        exit_code: 1,
+      toolResponse: {
+        exitCode: 1,
         stderr:
-          'TypeError at /home/seven/project/src/file.js:10:22 tmp/advisor-A1B2C3 2026-05-22T01:02:03Z hash aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa id 12345',
+          'TypeError: ENOENT at /home/seven/project/src/file.js:10:22 tmp/advisor-A1B2C3 2026-05-22T01:02:03Z hash aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa id 12345',
       },
     }),
   );
   const b = failureTracker.normalizeFailureSignature(
     failurePayload({
-      tool_response: {
-        exit_code: 1,
+      toolResponse: {
+        exitCode: 1,
         stderr:
-          'TypeError at /var/folders/random/src/file.js:987:1 tmp/advisor-Z9Y8X7 2027-09-10T11:12:13Z hash bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb id 67890',
+          'TypeError: ENOENT at /var/folders/random/src/file.js:987:1 tmp/advisor-Z9Y8X7 2027-09-10T11:12:13Z hash bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb id 67890',
       },
     }),
   );
   const differentExit = failureTracker.normalizeFailureSignature(
-    failurePayload({ tool_response: { exit_code: 2, stderr: 'TypeError at /tmp/other.js:1:1 id 999' } }),
+    failurePayload({ toolResponse: { exitCode: 2, stderr: 'TypeError at /tmp/other.js:1:1 id 999' } }),
   );
 
   assert.equal(a, b);
@@ -197,7 +197,7 @@ test('human packet includes D-12 fields non-null advisor recommendation and expl
 
   assert.equal(packet.event, 'human_approval.required');
   assert.equal(packet.retryRequired, true);
-  assert.equal(packet.advisorRecommendation, null, 'advisorRecommendation must not be nullable');
+  assert.notEqual(packet.advisorRecommendation, null, 'advisorRecommendation must not be nullable');
   assert.equal(packet.options.length, 4);
   assert.deepEqual(packet.options.map((option) => option.disposition), d13Dispositions);
 
