@@ -11,6 +11,7 @@ const failureTracker = require('../../hooks/advisor-failure-tracker.js');
 const repoRoot = path.resolve(__dirname, '..', '..', '..');
 const settingsPath = path.join(repoRoot, '.claude', 'settings.json');
 const gitignorePath = path.join(repoRoot, '.gitignore');
+const policy = JSON.parse(fs.readFileSync(path.join(repoRoot, '.claude', 'advisor-mode', 'policy.example.json'), 'utf8'));
 const d10DecisionClasses = ['irreversible', 'security-boundary', 'shared-production', 'governance-configuration'];
 const d13Dispositions = ['approve', 'reject', 'revise', 'defer'];
 
@@ -167,11 +168,12 @@ test('evaluateGatePolicy reads persisted repeated failure state using tracker si
       toolResponse: payload.toolResponse,
       taskState: payload.taskState,
       actionClass: payload.actionClass,
+      failureCount: 2,
     },
-    { root },
+    { root, policy },
   );
 
-  assert.equal(result.event, 'advisor_consultation.required');
+  assert.equal(result.gateAction, 'block');
   assert.equal(result.workflowGateStatus, 'blocked-pending-advisor');
   assert.equal(result.policyRuleId, 'repeated-failure-threshold');
   assert.equal(result.failureSignature, trackerSignature);
@@ -212,7 +214,7 @@ test('evaluateGatePolicy routes destructive force-push credential and production
     {
       name: 'force-push',
       event: { toolName: 'Bash', toolInput: { command: 'git push --force origin main' }, taskState: 'irreversible' },
-      expectedActionClass: 'force-push',
+      expectedActionClass: 'destructive',
     },
     {
       name: 'credential',
@@ -227,7 +229,7 @@ test('evaluateGatePolicy routes destructive force-push credential and production
   ];
 
   for (const testCase of cases) {
-    const first = gate.evaluateGatePolicy(testCase.event, { root });
+    const first = gate.evaluateGatePolicy(testCase.event, { root, policy });
     assert.equal(first.event, 'advisor_consultation.required', testCase.name);
     assert.equal(first.workflowGateStatus, 'blocked-pending-advisor', testCase.name);
     assert.equal(first.actionClass, testCase.expectedActionClass, testCase.name);
@@ -237,7 +239,7 @@ test('evaluateGatePolicy routes destructive force-push credential and production
       { correlationKey: first.correlationKey, riskLevel: first.risk, decisionClass: first.actionClass },
       validRecommendation({ correlationKey: first.correlationKey, riskLevel: first.risk }, first.requestPath),
     );
-    const packet = gate.evaluateGatePolicy(testCase.event, { root });
+    const packet = gate.evaluateGatePolicy(testCase.event, { root, policy });
     assert.equal(packet.event, 'human_approval.required', testCase.name);
     assert.equal(packet.workflowGateStatus, 'blocked-pending-human', testCase.name);
 
@@ -252,7 +254,7 @@ test('evaluateGatePolicy routes destructive force-push credential and production
         },
         { root },
       );
-      const retry = gate.evaluateGatePolicy(testCase.event, { root });
+      const retry = gate.evaluateGatePolicy(testCase.event, { root, policy });
       assert.equal(retry.gateAction, 'allow', testCase.name);
       assert.equal(retry.workflowGateStatus, 'satisfied', testCase.name);
       assert.equal(retry.reentryAllowed, true, testCase.name);
