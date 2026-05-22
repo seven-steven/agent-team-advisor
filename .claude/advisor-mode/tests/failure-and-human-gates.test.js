@@ -263,6 +263,52 @@ test('evaluateGatePolicy routes destructive force-push credential and production
   }
 });
 
+test('implementation-state force-push critical-action-human-approval through evaluateGatePolicy requires human_approval.required then disposition retry', () => {
+  const root = makeTempRoot('advisor-implementation-force-push-');
+  const event = {
+    hookEventName: 'PreToolUse',
+    toolName: 'Bash',
+    toolInput: { command: 'git push --force origin main' },
+    taskState: 'implementation',
+  };
+
+  const first = gate.evaluateGatePolicy(event, { root, policy });
+  assert.equal(first.event, 'advisor_consultation.required');
+  assert.equal(first.workflowGateStatus, 'blocked-pending-advisor');
+  assert.equal(first.policyRuleId, 'critical-action-human-approval');
+  assert.equal(first.actionClass, 'destructive');
+
+  writeRecommendation(
+    root,
+    { correlationKey: first.correlationKey, riskLevel: first.risk },
+    validRecommendation({ correlationKey: first.correlationKey, riskLevel: first.risk }, first.requestPath),
+  );
+  const recommendationOnly = gate.evaluateGatePolicy(event, { root, policy });
+  assert.equal(recommendationOnly.event, 'human_approval.required');
+  assert.equal(recommendationOnly.gateAction, 'block');
+  assert.equal(recommendationOnly.workflowGateStatus, 'blocked-pending-human');
+  assert.equal(recommendationOnly.retryRequired, true);
+  assert.equal(recommendationOnly.reentryAllowed, false);
+
+  for (const disposition of d13Dispositions) {
+    gate.writeDisposition(
+      {
+        correlationKey: recommendationOnly.correlationKey,
+        disposition,
+        decidedBy: 'human-operator',
+        rationale: `${disposition} implementation-state git push --force`,
+        appliesTo: { event: recommendationOnly.event },
+      },
+      { root },
+    );
+    const retry = gate.evaluateGatePolicy(event, { root, policy });
+    assert.equal(retry.gateAction, 'allow');
+    assert.equal(retry.workflowGateStatus, 'satisfied');
+    assert.equal(retry.reentryAllowed, true);
+    assert.equal(retry.disposition, disposition);
+  }
+});
+
 test('human packet includes D-12 fields non-null advisor recommendation and explicit retry', () => {
   const root = makeTempRoot();
   const input = decisionInput('security-boundary', root);

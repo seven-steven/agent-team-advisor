@@ -142,18 +142,36 @@ test('missing malformed or mismatched recommendations keep explicit retry blocke
   assert.equal(mismatched.reasonCode, 'invalid-recommendation-artifact');
 });
 
-test('valid matching read-only advisor recommendation satisfies explicit retry re-entry', () => {
+test('implementation-state git push --force critical-action-human-approval stays human_approval.required until disposition retry', () => {
   const root = makeTempRoot();
-  const blocked = gate.evaluateGatePolicy(highRiskBashEvent(), { root });
+  const event = highRiskBashEvent();
+  const blocked = gate.evaluateGatePolicy(event, { root });
   const request = JSON.parse(fs.readFileSync(blocked.requestPath, 'utf8'));
   writeJson(blocked.recommendationPath, validRecommendation(request));
 
-  const retry = gate.evaluateGatePolicy(highRiskBashEvent(), { root });
+  const recommendationOnly = gate.evaluateGatePolicy(event, { root });
+  assert.equal(recommendationOnly.event, 'human_approval.required');
+  assert.equal(recommendationOnly.gateAction, 'block');
+  assert.equal(recommendationOnly.workflowGateStatus, 'blocked-pending-human');
+  assert.equal(recommendationOnly.retryRequired, true);
+  assert.equal(recommendationOnly.reentryAllowed, false);
+
+  gate.writeDisposition(
+    {
+      correlationKey: recommendationOnly.correlationKey,
+      disposition: 'approve',
+      decidedBy: 'human-operator',
+      rationale: 'Approve implementation-state git push --force retry.',
+      appliesTo: { event: recommendationOnly.event },
+    },
+    { root },
+  );
+  const retry = gate.evaluateGatePolicy(event, { root });
   assert.equal(retry.gateAction, 'allow');
   assert.equal(retry.workflowGateStatus, 'satisfied');
   assert.equal(retry.retryRequired, true);
   assert.equal(retry.reentryAllowed, true);
-  assert.equal(retry.hookOutput.hookSpecificOutput.permissionDecision, 'allow');
+  assert.equal(retry.disposition, 'approve');
 });
 
 test('Read and low-risk events do not create advisor consultation artifacts', () => {
