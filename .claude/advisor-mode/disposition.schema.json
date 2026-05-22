@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Advisor Mode Human Approval Disposition",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["correlationKey", "event", "disposition", "decidedBy", "decidedAt", "rationale", "appliesTo"],
+  "properties": {
+    "correlationKey": { "type": "string", "minLength": 1 },
+    "event": { "type": "string", "const": "human_approval.disposition" },
+    "disposition": { "type": "string", "enum": ["approve", "reject", "revise", "defer"] },
+    "decidedBy": { "type": "string", "minLength": 1 },
+    "decidedAt": { "type": "string", "minLength": 1 },
+    "rationale": { "type": "string", "minLength": 1 },
+    "appliesTo": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["event"],
+      "properties": {
+        "event": { "type": "string", "const": "human_approval.required" }
+      }
+    },
+    "conditions": { "type": "array", "items": { "type": "string" } }
+  }
+}

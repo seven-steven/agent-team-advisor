@@ -66,6 +66,16 @@
             "timeout": 5
           }
         ]
+      },
+      {
+        "matcher": "Bash|Edit|Write|MultiEdit|Agent|Task",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"/usr/bin/node\" \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/advisor-failure-tracker.js",
+            "timeout": 5
+          }
+        ]
       }
     ],
     "PreToolUse": [

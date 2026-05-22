@@ -6,5 +6,7 @@
 !.advisor/consultations/requests/.gitkeep
 .advisor/consultations/recommendations/*.json
 !.advisor/consultations/recommendations/.gitkeep
+.advisor/decisions/dispositions/*.json
+!.advisor/decisions/dispositions/.gitkeep
 .claude/node_modules/
 .claude/worktrees/

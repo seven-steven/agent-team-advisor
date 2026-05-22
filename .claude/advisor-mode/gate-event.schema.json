@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Advisor Mode Gate Event",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["correlationKey", "event", "triggerReason", "workflowGateStatus", "retryRequired"],
+  "properties": {
+    "correlationKey": { "type": "string", "minLength": 1 },
+    "event": {
+      "type": "string",
+      "enum": [
+        "advisor_consultation.required",
+        "advisor_failure.observed",
+        "human_approval.required",
+        "human_approval.disposition"
+      ]
+    },
+    "triggerReason": { "type": "string", "minLength": 1 },
+    "workflowGateStatus": {
+      "type": "string",
+      "enum": ["observed", "blocked-pending-advisor", "blocked-pending-human", "satisfied", "hard-stop"]
+    },
+    "retryRequired": { "type": "boolean" },
+    "requiresAdvisorConsultation": { "type": "boolean" },
+    "requiresAdvisorDisposition": { "type": "boolean" },
+    "reentryAllowed": { "type": "boolean" },
+    "dispositionPath": { "type": "string" },
+    "requestPath": { "type": "string" },
+    "recommendationPath": { "type": "string" }
+  }
+}
