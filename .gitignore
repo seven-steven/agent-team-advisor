@@ -2,3 +2,5 @@
 !.advisor/audit/.gitkeep
 .advisor/state/*.json
 !.advisor/state/.gitkeep
+.claude/node_modules/
+.claude/worktrees/
