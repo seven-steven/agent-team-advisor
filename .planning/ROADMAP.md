@@ -14,7 +14,7 @@ Advisor Mode v1 builds a pure client-side Claude Code Teams workflow in dependen
 Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Repo-Scoped Advisor Foundation** - Maintainers can install project-local advisor assets with enforced executor/advisor role boundaries. (completed 2026-05-19)
-- [ ] **Phase 2: Enforced Trigger Gates** - Users can rely on policy-driven advisor and human approval gates before risky or repeated-failure actions proceed.
+- [ ] **Phase 2: Enforced Trigger Gates** - Users can rely on policy-driven advisor and human approval gates that host-block risky first attempts and require explicit retry after recommendation or disposition artifacts exist.
 - [ ] **Phase 3: Verdict Handoff and Verification Evidence** - Users receive structured advisor guidance, executor rationale, minimized context handoffs, and verification evidence.
 - [ ] **Phase 4: Provider Routing and Conformance** - Maintainers can route Claude semantic aliases to third-party models and validate provider compatibility before critical flows.
 - [ ] **Phase 5: Audit, Budget, and Operator Recovery** - Users can inspect correlated audit history, cap advisor cost/latency, validate installation, and disable enforcement safely.
@@ -55,11 +55,11 @@ Plans:
 **Requirements**: GATE-01, GATE-02, GATE-04, GATE-05, GATE-06, SAFE-04
 **Success Criteria** (what must be TRUE):
 
-1. User can require advisor consultation before configured high-risk Bash, Edit, Write, or MultiEdit actions execute.
+1. User can require advisor consultation before configured high-risk Bash, Edit, Write, or MultiEdit actions proceed, with the first risky attempt host-blocked through supported PreToolUse semantics.
 2. User can require advisor consultation when the same failure pattern repeats beyond a configurable threshold.
 3. User can allow low-risk read-only actions to proceed without advisor escalation.
-4. User can require explicit human approval for configured critical action classes, including destructive commands, force-pushes, credential changes, and production-affecting operations.
-5. User can protect advisor policy, hook scripts, provider routes, and Claude Code configuration changes behind advisor review or human approval.
+4. User can require explicit human approval for configured critical action classes, including destructive commands, force-pushes, credential changes, and production-affecting operations, with explicit retry after a valid disposition artifact exists.
+5. User can protect advisor policy, hook scripts, provider routes, and Claude Code configuration changes behind advisor review or human approval using the same recommendation/disposition chain.
 
 **Plans:** 4 plans
 
@@ -67,19 +67,19 @@ Plans:
 
 **Wave 1**
 
-- [ ] 02-01-PLAN.md — Verify real Claude Code runtime blocking/wait semantics and close the disposition re-entry contract before gate implementation.
+- [ ] 02-01-PLAN.md — Verify real Claude Code `permissionDecision`/exit-code semantics and close the explicit retry/disposition contract before gate implementation.
 
 **Wave 2** _(blocked on Wave 1 runtime semantics)_
 
-- [ ] 02-02-PLAN.md — Implement high-risk advisor consultation with request artifacts, explicit read-only advisor recommendation producer handoff, validated recommendation artifacts, and re-entry.
+- [ ] 02-02-PLAN.md — Implement high-risk advisor consultation with request artifacts, explicit read-only advisor recommendation producer handoff, validated recommendation artifacts, host-blocked first attempts, and explicit retry.
 
 **Wave 3** _(blocked on Wave 2 advisor recommendation chain)_
 
-- [ ] 02-03-PLAN.md — Implement threshold-2 repeated-failure escalation plus human approval packets, persisted approve/reject/revise/defer dispositions, and re-entry validation.
+- [ ] 02-03-PLAN.md — Implement threshold-2 repeated-failure escalation plus human approval packets, persisted approve/reject/revise/defer dispositions, explicit retry, and re-entry validation.
 
 **Wave 4** _(blocked on Wave 3 human disposition chain)_
 
-- [ ] 02-04-PLAN.md — Protect Advisor Mode configuration surfaces with path-class-first rules using the advisor recommendation and human disposition chains.
+- [ ] 02-04-PLAN.md — Protect Advisor Mode configuration surfaces with path-class-first rules using the advisor recommendation and human disposition plus explicit retry chains.
 
 ### Phase 3: Verdict Handoff and Verification Evidence
 
