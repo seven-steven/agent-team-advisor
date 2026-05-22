@@ -61,7 +61,7 @@ Plans:
 4. User can require explicit human approval for configured critical action classes, including destructive commands, force-pushes, credential changes, and production-affecting operations, with explicit retry after a valid disposition artifact exists.
 5. User can protect advisor policy, hook scripts, provider routes, and Claude Code configuration changes behind advisor review or human approval using the same recommendation/disposition chain.
 
-**Plans:** 5/5 plans complete
+**Plans:** 6/6 plans complete
 
 Plans:
 
@@ -137,7 +137,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | Phase                                        | Plans Complete | Status              | Completed  |
 | -------------------------------------------- | -------------- | ------------------- | ---------- |
 | 1. Repo-Scoped Advisor Foundation            | 4/4            | Complete            | 2026-05-19 |
-| 2. Enforced Trigger Gates                    | 5/5 | Complete   | 2026-05-22 |
+| 2. Enforced Trigger Gates                    | 6/6 | Complete   | 2026-05-22 |
 | 3. Verdict Handoff and Verification Evidence | 0/TBD          | Not started         | -          |
 | 4. Provider Routing and Conformance          | 0/TBD          | Not started         | -          |
 | 5. Audit, Budget, and Operator Recovery      | 0/TBD          | Not started         | -          |
