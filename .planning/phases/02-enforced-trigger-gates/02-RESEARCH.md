@@ -46,13 +46,16 @@ Locked decisions D-01 through D-17 remain binding:
 
 ## Runtime Semantics Resolution
 
-The previous unresolved research item “exact hook blocking JSON vs exit-code behavior” is no longer left to ad hoc implementation. Plan 01 is the required Wave 1 prerequisite and must:
+The previous unresolved research item “exact hook blocking JSON vs exit-code behavior” is resolved by Plan 01 evidence, not left to ad hoc implementation.
 
-1. Create automated tests for supported `PreToolUse` decision fields, local disposition validation, and explicit retry semantics.
-2. Implement a disposable `.claude/hooks/advisor-runtime-probe.js`.
-3. Run a real Claude Code hook smoke before any downstream gate implementation.
-4. Record the observed supported host contract in `02-RESEARCH.md` and `02-VALIDATION.md`, including that unsupported custom workflow metadata is not host-enforced.
-5. Stop Phase 2 execution if real Claude Code cannot support the `permissionDecision`/exit-code contract required by Plan 02.
+Observed Claude Code 2.1.146 host contract from the disposable PreToolUse smoke:
+
+1. `hookSpecificOutput.hookEventName: "PreToolUse"` plus `permissionDecision: "deny"` blocks the Bash tool call and surfaces `permissionDecisionReason` as the denial message.
+2. `permissionDecision: "allow"` permits the same Bash fixture to execute on explicit retry after a valid matching disposition artifact exists.
+3. Hooks exiting 0 with only `additionalContext` are accepted as contextual output and do not host-enforce local workflow state.
+4. Malformed stdin and missing tool-name probe inputs exit 0 without host-blocking, preserving the disposable probe's fail-open contract for non-meaningful events.
+5. Custom workflow metadata is recorded only inside local Advisor Mode state (`additionalContext` and `.advisor/decisions/dispositions/{correlationKey}.json`), not as host-enforced hook fields.
+6. Missing dispositions keep local state `blocked-pending-human`; valid matching `approve|reject|revise|defer` artifacts make the local state `satisfied` only for explicit retry.
 
 This converts runtime semantics from an unresolved implementation-time assumption into a front-loaded phase gate.
 
@@ -125,8 +128,8 @@ All Phase 2 feasibility questions are formally resolved for planning:
 
 | Former question                                      | Resolution status | Final runtime contract                                                                                                                                   |
 | ---------------------------------------------------- | ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Exact hook blocking JSON vs exit-code behavior       | RESOLVED          | Plan 01 is the Wave 1 prerequisite; it records the observed Claude Code `permissionDecision`/exit-code behavior before Plans 02-04 execute.             |
-| Whether D-11 wait-for-disposition semantics are safe | RESOLVED          | Human approval remains workflow state, not host wait-state; missing disposition remains blocked locally until explicit retry after a valid artifact.      |
+| Exact hook blocking JSON vs exit-code behavior       | RESOLVED          | Plan 01 is the Wave 1 prerequisite; it records the observed Claude Code `permissionDecision`/exit-code behavior before Plans 02-04 execute.              |
+| Whether D-11 wait-for-disposition semantics are safe | RESOLVED          | Human approval remains workflow state, not host wait-state; missing disposition remains blocked locally until explicit retry after a valid artifact.     |
 | Whether high-risk gate infrastructure may fail open  | RESOLVED          | Only malformed host payload or missing tool name fail open; policy-load, classification, and request-write failure on configured/gated events hard-stop. |
 | Who produces advisor recommendation artifacts        | RESOLVED          | Executor triggers read-only `advisor-reviewer` with request artifact input and persists matching recommendation artifact for explicit retry re-entry.    |
 | Whether protected surfaces use a separate gate model | RESOLVED          | Protected surfaces reuse the Plan 02 advisor producer chain and Plan 03 human disposition chain, with path-class-first policy data.                      |
