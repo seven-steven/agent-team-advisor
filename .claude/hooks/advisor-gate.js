@@ -90,14 +90,31 @@ function classifyActionClass(toolName, toolInput = {}, policy) {
   return 'low-risk';
 }
 
+function pathMatchesConfig(filePath, config = {}) {
+  if ((config.exceptions || []).includes(filePath)) return false;
+  if ((config.files || []).includes(filePath)) return true;
+  if ((config.prefixes || []).some((prefix) => filePath === prefix || filePath.startsWith(`${prefix}/`))) return true;
+  return matchesAny(filePath, config.patterns || []);
+}
+
 function classifyPathClass(toolName, toolInput = {}, policy) {
-  const pathClasses = requirePolicySection(policy, 'pathClasses');
   const filePath = extractPath(toolInput);
   if (!filePath) return 'none';
+  const protectedSurfaces = policy && policy.advisorMode && policy.advisorMode.gates && policy.advisorMode.gates.protectedSurfaces;
+  if (protectedSurfaces) {
+    if ((protectedSurfaces.exceptions || []).includes(filePath)) return 'ordinary';
+    const classes = Object.entries(protectedSurfaces.classes || {});
+    for (const [className, config] of classes) {
+      if ((config.files || []).includes(filePath)) return className;
+    }
+    for (const [className, config] of classes) {
+      if ((config.prefixes || []).some((prefix) => filePath === prefix || filePath.startsWith(`${prefix}/`))) return className;
+      if (matchesAny(filePath, config.patterns || [])) return className;
+    }
+  }
+  const pathClasses = requirePolicySection(policy, 'pathClasses');
   for (const [className, config] of Object.entries(pathClasses)) {
-    if ((config.prefixes || []).some((prefix) => filePath === prefix || filePath.startsWith(`${prefix}/`))) return className;
-    if ((config.files || []).includes(filePath)) return className;
-    if (matchesAny(filePath, config.patterns || [])) return className;
+    if (pathMatchesConfig(filePath, config)) return className;
   }
   return 'ordinary';
 }
@@ -165,7 +182,7 @@ function buildAdvisorProducerInstruction(requestPath, recommendationPath) {
 
 function buildRequest(event, classes, rule, paths) {
   const risk = rule.risk || 'high';
-  return {
+  const request = {
     correlationKey: paths.correlationKey,
     event: 'advisor_consultation.required',
     triggerReason: rule.triggerReason || rule.id || 'high-risk advisor consultation required',
@@ -180,6 +197,8 @@ function buildRequest(event, classes, rule, paths) {
     recommendationPath: paths.recommendationPath,
     advisorProducer: buildAdvisorProducerInstruction(paths.requestPath, paths.recommendationPath),
   };
+  if (rule.auditLabel) request.auditLabel = rule.auditLabel;
+  return request;
 }
 
 function writeConsultationRequest(request) {
@@ -286,6 +305,7 @@ function buildDecisionPacket(input = {}, options = {}) {
     recommendationPath,
     advisorProducer: buildAdvisorProducerInstruction(requestPath, recommendationPath),
   };
+  if (input.auditLabel) request.auditLabel = input.auditLabel;
 
   const readResult = readAdvisorRecommendation(recommendationPath);
   if (!readResult.ok || !validateAdvisorRecommendation(readResult.recommendation, request)) {
@@ -307,7 +327,7 @@ function buildDecisionPacket(input = {}, options = {}) {
     return { gateAction: 'none', reasonCode: 'non-critical-decision-class', correlationKey };
   }
 
-  return {
+  const packet = {
     correlationKey,
     event: 'human_approval.required',
     triggerReason: request.triggerReason,
@@ -329,6 +349,8 @@ function buildDecisionPacket(input = {}, options = {}) {
     requiresExplicitRetry: true,
     hostWaitAndResume: false,
   };
+  if (input.auditLabel) packet.auditLabel = input.auditLabel;
+  return packet;
 }
 
 function writeDisposition(dispositionInput = {}, options = {}) {
@@ -431,6 +453,25 @@ function evaluateGatePolicy(rawEvent, options = {}) {
 
   const paths = getConsultationPaths(event, options);
   const request = buildRequest(event, classes, rule, paths);
+  if (rule.gateAction === 'human-approval') {
+    const decisionPacket = buildDecisionPacket(
+      {
+        correlationKey: paths.correlationKey,
+        decisionClass: event.taskState,
+        toolName: event.toolName,
+        toolClass: classes.toolClass,
+        pathClass: classes.pathClass,
+        risk: rule.risk || 'critical',
+        policyRuleId: rule.id,
+        triggerReason: rule.triggerReason,
+        decisionSummary: `${rule.triggerReason || rule.id}: ${extractPath(event.toolInput)}`,
+        auditLabel: rule.auditLabel,
+      },
+      { ...options, requestPath: paths.requestPath, recommendationPath: paths.recommendationPath },
+    );
+    return { ...decisionPacket, gateAction: decisionPacket.event === 'human_approval.required' ? 'block' : 'block', policyRuleId: rule.id };
+  }
+
   const readResult = readAdvisorRecommendation(paths.recommendationPath);
   if (readResult.ok && validateAdvisorRecommendation(readResult.recommendation, request)) {
     return {
@@ -442,6 +483,7 @@ function evaluateGatePolicy(rawEvent, options = {}) {
       requestPath: paths.requestPath,
       recommendationPath: paths.recommendationPath,
       policyRuleId: rule.id,
+      auditLabel: rule.auditLabel,
       hookOutput: buildDecision('allow', 'Valid read-only advisor recommendation exists; explicit retry may proceed.'),
     };
   }
@@ -462,6 +504,7 @@ function evaluateGatePolicy(rawEvent, options = {}) {
     requestPath: paths.requestPath,
     recommendationPath: paths.recommendationPath,
     policyRuleId: rule.id,
+    auditLabel: rule.auditLabel,
     hookOutput: buildDecision(
       'deny',
       'Advisor consultation is required before this high-risk workflow path proceeds. Retry only after the recommendation artifact exists and validates.',

@@ -32,10 +32,11 @@ Phase 1 validates local scaffold installation only. Provider routing conformance
 
 Phase 2 adds policy-driven advisor and human approval gates on top of the scaffold.
 
-### Host contract vs workflow state
+### Host permissions vs workflow gates
 
+- Claude Code host permissions still decide whether tools may execute; Advisor Mode does not replace the host permission layer.
 - Claude Code host enforcement uses supported `PreToolUse` semantics such as `hookSpecificOutput.permissionDecision` and documented exit-code behavior.
-- Advisor Mode workflow state uses local artifacts and state fields such as request paths, recommendation paths, disposition paths, `workflowGateStatus`, and `retryRequired`.
+- Advisor Mode workflow gates use local artifacts and state fields such as request paths, recommendation paths, disposition paths, `workflowGateStatus`, and `retryRequired`.
 - Unsupported custom hook metadata is not relied on as a host-enforced blocking protocol.
 
 ### High-risk advisor consultation
