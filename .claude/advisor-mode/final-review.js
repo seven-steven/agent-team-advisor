@@ -1,7 +1,12 @@
 const fs = require('node:fs');
 const path = require('node:path');
 
-const SCHEMA_PATH = path.join(__dirname, 'context-packet.schema.json');
+const VERDICT_SCHEMA_PATH = path.join(__dirname, 'verdict.schema.json');
+const VALID_VERDICT_VALUES = {
+  status: new Set(['PASS', 'CONCERNS', 'FAIL', 'BLOCKED']),
+  risk: new Set(['low', 'medium', 'high', 'critical']),
+  confidence: new Set(['low', 'medium', 'high']),
+};
 const FORBIDDEN_FIELDS = new Set(['transcript', 'full_transcript', 'raw_log']);
 const ARRAY_FIELDS = [
   'changed_files',
@@ -10,8 +15,12 @@ const ARRAY_FIELDS = [
   'explicit_questions',
 ];
 
-function readSchema() {
-  return JSON.parse(fs.readFileSync(SCHEMA_PATH, 'utf8'));
+function readContextSchema() {
+  return JSON.parse(fs.readFileSync(path.join(__dirname, 'context-packet.schema.json'), 'utf8'));
+}
+
+function readVerdictSchema() {
+  return JSON.parse(fs.readFileSync(VERDICT_SCHEMA_PATH, 'utf8'));
 }
 
 function copyArray(value) {
@@ -61,7 +70,7 @@ function buildContextPacket(input = {}) {
 }
 
 function validateContextPacket(packet) {
-  const schema = readSchema();
+  const schema = readContextSchema();
   const errors = [];
 
   if (!packet || typeof packet !== 'object' || Array.isArray(packet)) {
@@ -138,7 +147,107 @@ function validateContextPacket(packet) {
   return { ok: errors.length === 0, errors };
 }
 
+function normalizeRecommendedActions(recommendedActions) {
+  if (!Array.isArray(recommendedActions)) {
+    return [];
+  }
+
+  return recommendedActions.map((action, index) => {
+    const generatedId = `rec-${String(index + 1).padStart(3, '0')}`;
+    if (typeof action === 'string') {
+      return { id: generatedId, description: action };
+    }
+    if (action && typeof action === 'object' && !Array.isArray(action)) {
+      return {
+        ...action,
+        id: typeof action.id === 'string' && action.id.length > 0 ? action.id : generatedId,
+      };
+    }
+    return { id: generatedId, description: '' };
+  });
+}
+
+function validateStringArray(value, field, errors, options = {}) {
+  if (!Array.isArray(value)) {
+    errors.push(`${field} must be an array`);
+    return;
+  }
+  if (options.minItems && value.length < options.minItems) {
+    errors.push(`${field} must include at least ${options.minItems} item`);
+  }
+  value.forEach((item, index) => {
+    if (typeof item !== 'string' || item.length === 0) {
+      errors.push(`${field}[${index}] must be a non-empty string`);
+    }
+  });
+}
+
+function validateVerdict(verdict) {
+  const schema = readVerdictSchema();
+  const errors = [];
+
+  if (!verdict || typeof verdict !== 'object' || Array.isArray(verdict)) {
+    return { ok: false, errors: ['verdict must be an object'], direct_completion_allowed: false };
+  }
+
+  const allowedFields = new Set(Object.keys(schema.properties || {}));
+  Object.keys(verdict).forEach((key) => {
+    if (!allowedFields.has(key)) {
+      errors.push(`unexpected field: ${key}`);
+    }
+  });
+
+  (schema.required || []).forEach((field) => {
+    if (!Object.hasOwn(verdict, field)) {
+      errors.push(`missing required field: ${field}`);
+    }
+  });
+
+  for (const [field, values] of Object.entries(VALID_VERDICT_VALUES)) {
+    if (!values.has(verdict[field])) {
+      errors.push(`${field} must be one of: ${Array.from(values).join(', ')}`);
+    }
+  }
+
+  validateStringArray(verdict.blocking_findings, 'blocking_findings', errors);
+  validateStringArray(verdict.verification_guidance, 'verification_guidance', errors);
+  validateStringArray(verdict.validation_checklist, 'validation_checklist', errors, { minItems: 1 });
+
+  const normalizedActions = normalizeRecommendedActions(verdict.recommended_actions);
+  if (!Array.isArray(verdict.recommended_actions)) {
+    errors.push('recommended_actions must be an array');
+  }
+  normalizedActions.forEach((action, index) => {
+    if (typeof action.id !== 'string' || action.id.length === 0) {
+      errors.push(`recommended_actions[${index}].id must be a non-empty string`);
+    }
+    if (typeof action.description !== 'string' || action.description.length === 0) {
+      errors.push(`recommended_actions[${index}].description must be a non-empty string`);
+    }
+  });
+
+  for (const field of ['correlationKey', 'context_packet_ref', 'created_at']) {
+    if (typeof verdict[field] !== 'string' || verdict[field].length === 0) {
+      errors.push(`${field} must be a non-empty string`);
+    }
+  }
+
+  const normalizedVerdict = {
+    ...verdict,
+    recommended_actions: normalizedActions,
+  };
+
+  return {
+    ok: errors.length === 0,
+    errors,
+    verdict: normalizedVerdict,
+    direct_completion_allowed: errors.length === 0 && verdict.status === 'PASS',
+  };
+}
+
 module.exports = {
   buildContextPacket,
   validateContextPacket,
+  normalizeRecommendedActions,
+  validateVerdict,
 };

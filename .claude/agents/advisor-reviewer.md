@@ -19,8 +19,9 @@ Return a verdict-first response with:
 1. status: PASS, CONCERNS, FAIL, or BLOCKED
 2. risk level and confidence
 3. blocking findings
-4. recommended executor actions
+4. recommended executor actions, using stable recommendation IDs when available
 5. verification guidance
+6. validation checklist with concrete checks performed against the supplied context
 
 When the executor provides a minimized context packet, answer its explicit questions directly. If the packet is insufficient, request the specific additional context needed; do not assume missing facts or request a full transcript by default.
 </output>
