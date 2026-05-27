@@ -15,7 +15,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Repo-Scoped Advisor Foundation** - Maintainers can install project-local advisor assets with enforced executor/advisor role boundaries. (completed 2026-05-19)
 - [x] **Phase 2: Enforced Trigger Gates** - Users can rely on policy-driven advisor and human approval gates that host-block risky first attempts and require explicit retry after recommendation or disposition artifacts exist. (gap closure planned 2026-05-22) (completed 2026-05-22)
-- [ ] **Phase 3: Verdict Handoff and Verification Evidence** - Users receive structured advisor guidance, executor rationale, minimized context handoffs, and verification evidence.
+- [x] **Phase 3: Verdict Handoff and Verification Evidence** - Users receive structured advisor guidance, executor rationale, minimized context handoffs, and verification evidence. (completed 2026-05-27)
 - [ ] **Phase 4: Provider Routing and Conformance** - Maintainers can route Claude semantic aliases to third-party models and validate provider compatibility before critical flows.
 - [ ] **Phase 5: Audit, Budget, and Operator Recovery** - Users can inspect correlated audit history, cap advisor cost/latency, validate installation, and disable enforcement safely.
 
@@ -98,7 +98,8 @@ Plans:
 3. User can see whether the executor accepted, rejected, or deferred each advisor recommendation, with a recorded rationale.
 4. User can send advisors a minimized context packet based on relevant diffs, errors, files, and explicit questions instead of the full transcript by default.
 5. User can capture verification evidence for guarded work, including commands run, exit status, concise result summaries, changed files, and residual risks.
-   **Plans**: TBD
+
+**Plans:** 7/7 plans complete
 
 ### Phase 4: Provider Routing and Conformance
 
@@ -134,10 +135,10 @@ Plans:
 **Execution Order:**
 Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 
-| Phase                                        | Plans Complete | Status              | Completed  |
-| -------------------------------------------- | -------------- | ------------------- | ---------- |
-| 1. Repo-Scoped Advisor Foundation            | 4/4            | Complete            | 2026-05-19 |
-| 2. Enforced Trigger Gates                    | 6/6 | Complete   | 2026-05-22 |
-| 3. Verdict Handoff and Verification Evidence | 0/TBD          | Not started         | -          |
-| 4. Provider Routing and Conformance          | 0/TBD          | Not started         | -          |
-| 5. Audit, Budget, and Operator Recovery      | 0/TBD          | Not started         | -          |
+| Phase                                        | Plans Complete | Status      | Completed  |
+| -------------------------------------------- | -------------- | ----------- | ---------- |
+| 1. Repo-Scoped Advisor Foundation            | 4/4            | Complete    | 2026-05-19 |
+| 2. Enforced Trigger Gates                    | 6/6            | Complete    | 2026-05-22 |
+| 3. Verdict Handoff and Verification Evidence | 7/7            | Complete    | 2026-05-27 |
+| 4. Provider Routing and Conformance          | 0/TBD          | Not started | -          |
+| 5. Audit, Budget, and Operator Recovery      | 0/TBD          | Not started | -          |

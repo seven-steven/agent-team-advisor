@@ -17,15 +17,15 @@ Requirements for initial release. Each maps to roadmap phases.
 
 - [ ] **GATE-01**: User can require advisor consultation before configured high-risk Bash, Edit, Write, or MultiEdit actions execute
 - [ ] **GATE-02**: User can require advisor consultation after the same failure pattern repeats beyond a configurable threshold
-- [ ] **GATE-03**: User can require a fresh advisor final review before a non-trivial task is marked complete
+- [x] **GATE-03**: User can require a fresh advisor final review before a non-trivial task is marked complete
 - [ ] **GATE-04**: User can require explicit human approval for configured critical action classes such as destructive commands, force-pushes, credential changes, and production-affecting operations
 - [ ] **GATE-05**: User can allow low-risk read-only actions to proceed without advisor escalation
 - [ ] **GATE-06**: Project maintainer can configure risk-scored advisor trigger rules using tool class, file/path class, failure count, and task-completion state
 
 ### Advisor Verdicts
 
-- [ ] **VERD-01**: User can receive a structured advisor verdict containing risk level, confidence, blocking findings, recommended next actions, and a validation checklist
-- [ ] **VERD-02**: User can see whether the executor accepted, rejected, or deferred each advisor recommendation, with a recorded rationale
+- [x] **VERD-01**: User can receive a structured advisor verdict containing risk level, confidence, blocking findings, recommended next actions, and a validation checklist
+- [x] **VERD-02**: User can see whether the executor accepted, rejected, or deferred each advisor recommendation, with a recorded rationale
 
 ### Routing & Models
 
@@ -37,7 +37,7 @@ Requirements for initial release. Each maps to roadmap phases.
 ### Audit & Verification
 
 - [ ] **AUDT-01**: User can inspect an append-only local audit trail for advisor triggers, hook decisions, provider routes, advisor verdicts, and executor follow-up decisions
-- [ ] **AUDT-02**: User can capture verification evidence for guarded work, including commands run, exit status, concise result summaries, changed files, and residual risks
+- [x] **AUDT-02**: User can capture verification evidence for guarded work, including commands run, exit status, concise result summaries, changed files, and residual risks
 - [ ] **AUDT-03**: User can correlate advisor-mode audit events with task or session identifiers
 
 ### Safety & Operations
@@ -88,32 +88,32 @@ Deferred to future release. Tracked but not in current roadmap.
 
 Which phases cover which requirements. Updated during roadmap creation.
 
-| Requirement | Phase   | Status  |
-| ----------- | ------- | ------- |
-| AGNT-01     | Phase 1 | Pending |
-| AGNT-02     | Phase 1 | Pending |
-| AGNT-03     | Phase 1 | Pending |
-| GATE-01     | Phase 2 | Pending |
-| GATE-02     | Phase 2 | Pending |
-| GATE-03     | Phase 3 | Pending |
-| GATE-04     | Phase 2 | Pending |
-| GATE-05     | Phase 2 | Pending |
-| GATE-06     | Phase 2 | Pending |
-| VERD-01     | Phase 3 | Pending |
-| VERD-02     | Phase 3 | Pending |
-| ROUT-01     | Phase 4 | Pending |
-| ROUT-02     | Phase 4 | Pending |
-| ROUT-03     | Phase 4 | Pending |
-| ROUT-04     | Phase 4 | Pending |
-| AUDT-01     | Phase 5 | Pending |
-| AUDT-02     | Phase 3 | Pending |
-| AUDT-03     | Phase 5 | Pending |
-| SAFE-01     | Phase 5 | Pending |
-| SAFE-02     | Phase 3 | Pending |
-| SAFE-03     | Phase 5 | Pending |
-| SAFE-04     | Phase 2 | Pending |
-| SETP-01     | Phase 1 | Pending |
-| SETP-02     | Phase 5 | Pending |
+| Requirement | Phase   | Status   |
+| ----------- | ------- | -------- |
+| AGNT-01     | Phase 1 | Pending  |
+| AGNT-02     | Phase 1 | Pending  |
+| AGNT-03     | Phase 1 | Pending  |
+| GATE-01     | Phase 2 | Pending  |
+| GATE-02     | Phase 2 | Pending  |
+| GATE-03     | Phase 3 | Complete |
+| GATE-04     | Phase 2 | Pending  |
+| GATE-05     | Phase 2 | Pending  |
+| GATE-06     | Phase 2 | Pending  |
+| VERD-01     | Phase 3 | Complete |
+| VERD-02     | Phase 3 | Complete |
+| ROUT-01     | Phase 4 | Pending  |
+| ROUT-02     | Phase 4 | Pending  |
+| ROUT-03     | Phase 4 | Pending  |
+| ROUT-04     | Phase 4 | Pending  |
+| AUDT-01     | Phase 5 | Pending  |
+| AUDT-02     | Phase 3 | Complete |
+| AUDT-03     | Phase 5 | Pending  |
+| SAFE-01     | Phase 5 | Pending  |
+| SAFE-02     | Phase 3 | Complete |
+| SAFE-03     | Phase 5 | Pending  |
+| SAFE-04     | Phase 2 | Pending  |
+| SETP-01     | Phase 1 | Pending  |
+| SETP-02     | Phase 5 | Pending  |
 
 **Coverage:**
 
@@ -124,4 +124,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 ---
 
 _Requirements defined: 2026-05-19_
-_Last updated: 2026-05-19 after roadmap creation_
+_Last updated: 2026-05-27 after Phase 03 completion_
