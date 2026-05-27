@@ -78,3 +78,34 @@ Run:
 ```bash
 node --test .claude/advisor-mode/tests/*.test.js
 ```
+
+## Phase 3 Final Review
+
+Phase 3 closes non-trivial work with a guarded completion flow that keeps advisor review read-only and executor decisions explicit.
+
+1. The executor builds a minimized final-review context packet from changed files, relevant diff excerpts, relevant errors, verification summary, and explicit questions. Full transcript forwarding is not the default.
+2. The read-only advisor returns a fresh structured final verdict for the current completion state.
+3. The executor records verification evidence for the guarded task before completion.
+4. For `CONCERNS`, `FAIL`, or `BLOCKED` verdicts, the executor records per-recommendation follow-up decisions before completion can proceed.
+5. Completion is allowed only when `.claude/hooks/advisor-final-review-gate.js` sees fresh matching state for the current verdict, verification evidence, changed files, fingerprint, and any required executor decision.
+
+### Phase 3 runtime artifacts
+
+Generated Phase 3 artifacts stay under ignored local `.advisor/` paths:
+
+- `.advisor/evidence/verification/*.json` — immutable verification evidence snapshots for guarded work.
+- `.advisor/decisions/executor/*.json` — executor accept/reject/defer rationale for advisor recommendations.
+- `.advisor/state/final-review.json` — current final-review freshness binding checked by the Stop hook.
+- `.advisor/audit/events.jsonl` — append-only runtime events for evidence and executor decision recording.
+
+### Phase 3 validation
+
+Run the full advisor-mode regression suite:
+
+```bash
+node --test .claude/advisor-mode/tests/*.test.js
+```
+
+### Deferred phase boundaries
+
+Provider routing and conformance validation remain Phase 4 scope. Budgets, rollback, and broader audit exploration remain Phase 5 scope.
