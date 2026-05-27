@@ -162,6 +162,34 @@ test('validateExecutorDecision requires one valid decision per normalized recomm
   assert.equal(invalid.errors.some((error) => error.includes('disposition')), true);
 });
 
+test('validateExecutorDecision rejects duplicate recommendation decisions', () => {
+  const verdict = makeVerdict();
+  const artifact = {
+    artifact_type: 'executor-decision',
+    correlationKey: verdict.correlationKey,
+    verdict_ref: `.advisor/verdicts/${verdict.correlationKey}.json`,
+    executor_decisions: [
+      ...makeDecisions().map((decision) => ({
+        ...decision,
+        decided_at: '2026-05-27T07:01:00.000Z',
+      })),
+      {
+        recommendation_id: 'rec-keep-tests',
+        disposition: 'rejected',
+        rationale: 'Contradictory duplicate should not validate.',
+        evidence_refs: ['.advisor/evidence/verification/final-review-03-03.json#commands.0'],
+        decided_at: '2026-05-27T07:02:00.000Z',
+      },
+    ],
+    created_at: '2026-05-27T07:01:00.000Z',
+  };
+
+  const result = validateExecutorDecision(artifact, verdict);
+
+  assert.equal(result.ok, false);
+  assert.equal(result.errors.some((error) => error.includes('duplicate') && error.includes('rec-keep-tests')), true);
+});
+
 test('recordExecutorDecision appends concise audit event after validation', () => {
   const root = makeTempRepo();
   const verdict = makeVerdict();
