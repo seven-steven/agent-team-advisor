@@ -519,6 +519,78 @@ function recordVerificationEvidence(input = {}, options = {}) {
   return { ok: true, path: artifactPath, artifact };
 }
 
+function readJson(filePath, fallback) {
+  try {
+    return JSON.parse(fs.readFileSync(filePath, 'utf8'));
+  } catch {
+    return fallback;
+  }
+}
+
+function sameStringArray(left, right) {
+  if (!Array.isArray(left) || !Array.isArray(right) || left.length !== right.length) return false;
+  return left.every((value, index) => value === right[index]);
+}
+
+function finalReviewStatePath(root) {
+  return path.join(root, '.advisor', 'state', 'final-review.json');
+}
+
+function recordFinalReviewState(input = {}, options = {}) {
+  const root = options.root || process.cwd();
+  const state = {
+    correlationKey: input.correlationKey,
+    verdict_ref: input.verdict_ref,
+    verification_evidence_ref: input.verification_evidence_ref,
+    changed_files: Array.isArray(input.changed_files) ? input.changed_files.slice() : input.changed_files,
+    changed_files_fingerprint: input.changed_files_fingerprint,
+    reviewed_at: input.reviewed_at || new Date().toISOString(),
+  };
+  if (input.executor_decision_ref !== undefined) state.executor_decision_ref = input.executor_decision_ref;
+  if (input.status !== undefined) state.status = input.status;
+
+  const errors = [];
+  for (const field of ['correlationKey', 'verdict_ref', 'verification_evidence_ref', 'changed_files_fingerprint', 'reviewed_at']) {
+    if (typeof state[field] !== 'string' || state[field].length === 0) errors.push(`${field} must be a non-empty string`);
+  }
+  validateStringArray(state.changed_files, 'changed_files', errors);
+  if (state.executor_decision_ref !== undefined && (typeof state.executor_decision_ref !== 'string' || state.executor_decision_ref.length === 0)) {
+    errors.push('executor_decision_ref must be a non-empty string when present');
+  }
+  if (errors.length > 0) return { ok: false, errors };
+
+  const statePath = finalReviewStatePath(root);
+  writeJson(statePath, state);
+  return { ok: true, path: statePath, state };
+}
+
+function isFinalReviewFresh(input = {}, options = {}) {
+  const root = options.root || process.cwd();
+  const state = options.state || readJson(finalReviewStatePath(root), null);
+  const errors = [];
+
+  if (!state || typeof state !== 'object' || Array.isArray(state)) {
+    return { ok: false, fresh: false, errors: ['missing final-review state'], statePath: finalReviewStatePath(root) };
+  }
+
+  for (const field of ['correlationKey', 'verdict_ref', 'verification_evidence_ref', 'changed_files_fingerprint']) {
+    if (state[field] !== input[field]) errors.push(`${field} mismatch`);
+  }
+  if (!sameStringArray(state.changed_files, input.changed_files)) errors.push('changed_files mismatch');
+  if (typeof state.reviewed_at !== 'string' || state.reviewed_at.length === 0) errors.push('reviewed_at missing');
+  if (input.executor_decision_ref !== undefined && state.executor_decision_ref !== input.executor_decision_ref) {
+    errors.push('executor_decision_ref mismatch');
+  }
+
+  return {
+    ok: errors.length === 0,
+    fresh: errors.length === 0,
+    errors,
+    state,
+    statePath: finalReviewStatePath(root),
+  };
+}
+
 module.exports = {
   buildContextPacket,
   validateContextPacket,
@@ -528,4 +600,6 @@ module.exports = {
   validateExecutorDecision,
   recordVerificationEvidence,
   validateVerificationEvidence,
+  recordFinalReviewState,
+  isFinalReviewFresh,
 };
