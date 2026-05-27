@@ -82,7 +82,7 @@ test('validateVerdict requires executor follow-up for every non-PASS status', ()
   }
 });
 
-test('validateVerdict rejects malformed enums and missing checklist items without throwing', () => {
+test('validateVerdict rejects nested extras and invalid timestamps', () => {
   const invalid = validateVerdict(
     makeVerdict({
       status: 'DONE',
@@ -98,4 +98,27 @@ test('validateVerdict rejects malformed enums and missing checklist items withou
   assert.equal(invalid.errors.some((error) => error.includes('risk')), true);
   assert.equal(invalid.errors.some((error) => error.includes('confidence')), true);
   assert.equal(invalid.errors.some((error) => error.includes('validation_checklist')), true);
+
+  const extraActionField = validateVerdict(
+    makeVerdict({
+      recommended_actions: [
+        {
+          id: 'rec-existing',
+          description: 'Keep existing verification evidence linked.',
+          extra: 'schema drift',
+        },
+      ],
+    }),
+  );
+  assert.equal(extraActionField.ok, false);
+  assert.equal(extraActionField.direct_completion_allowed, false);
+  assert.equal(extraActionField.errors.some((error) => error.includes('recommended_actions[0]') && error.includes('extra')), true);
+
+  const invalidTimestamp = validateVerdict(makeVerdict({ created_at: 'not-a-date' }));
+  assert.equal(invalidTimestamp.ok, false);
+  assert.equal(invalidTimestamp.direct_completion_allowed, false);
+  assert.equal(invalidTimestamp.errors.some((error) => error.includes('created_at')), true);
+
+  const validTimestamp = validateVerdict(makeVerdict({ created_at: '2026-05-27T06:30:00.000Z' }));
+  assert.equal(validTimestamp.ok, true);
 });
