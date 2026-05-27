@@ -139,6 +139,17 @@
           }
         ]
       }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"/usr/bin/node\" \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/advisor-final-review-gate.js",
+            "timeout": 5
+          }
+        ]
+      }
     ]
   }
 }
