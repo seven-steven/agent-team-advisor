@@ -95,6 +95,18 @@ function makeExecutorDecision() {
   };
 }
 
+function stopHookCommands(settings) {
+  return (settings.hooks.Stop || []).flatMap((entry) =>
+    (entry.hooks || []).map((hook) => hook.command),
+  );
+}
+
+function allHookCommands(settings) {
+  return Object.values(settings.hooks || {}).flatMap((entries) =>
+    entries.flatMap((entry) => (entry.hooks || []).map((hook) => hook.command)),
+  );
+}
+
 function writeFinalReviewArtifacts(root, { verdict = makeVerdict(), evidence = makeEvidence(), executorDecision, state } = {}) {
   writeJson(path.join(root, '.advisor', 'verdicts', 'final-review-03-05.json'), verdict);
   writeJson(path.join(root, '.advisor', 'evidence', 'verification', 'final-review-03-05.json'), evidence);
@@ -199,4 +211,16 @@ test('non-PASS final verdict blocks until matching executor-decision artifact ex
 
   assert.equal(satisfied.gateAction, 'allow');
   assert.equal(satisfied.reasonCode, 'fresh-non-pass-final-review-with-executor-decision');
+});
+
+test('settings wire exactly one Stop hook for final review gate while preserving existing advisor hooks', () => {
+  const settings = JSON.parse(fs.readFileSync(path.join(projectRoot, '.claude', 'settings.json'), 'utf8'));
+  const stopCommands = stopHookCommands(settings).filter((command) => command.includes('advisor-final-review-gate.js'));
+  const allCommands = allHookCommands(settings);
+
+  assert.equal(stopCommands.length, 1);
+  assert.match(stopCommands[0], /\.claude\/hooks\/advisor-final-review-gate\.js/);
+  assert.equal(allCommands.some((command) => command.includes('advisor-gate.js')), true);
+  assert.equal(allCommands.some((command) => command.includes('advisor-boundary-check.js')), true);
+  assert.equal(allCommands.some((command) => command.includes('advisor-failure-tracker.js')), true);
 });
