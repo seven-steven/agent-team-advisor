@@ -1,0 +1,85 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Advisor Mode Context Packet",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "packet_type",
+    "changed_files",
+    "relevant_diff_excerpts",
+    "relevant_errors",
+    "explicit_questions",
+    "created_at"
+  ],
+  "properties": {
+    "packet_type": {
+      "type": "string",
+      "const": "advisor-final-review-context"
+    },
+    "correlationKey": {
+      "type": "string",
+      "minLength": 1
+    },
+    "task_summary": {
+      "type": "string"
+    },
+    "changed_files": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "relevant_diff_excerpts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["file", "excerpt"],
+        "properties": {
+          "file": {
+            "type": "string",
+            "minLength": 1
+          },
+          "excerpt": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "relevant_errors": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "explicit_questions": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "verification_summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "command": {
+          "type": "string"
+        },
+        "exit_status": {
+          "type": "integer"
+        },
+        "summary": {
+          "type": "string"
+        }
+      }
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}
