@@ -21,4 +21,6 @@ Return a verdict-first response with:
 3. blocking findings
 4. recommended executor actions
 5. verification guidance
+
+When the executor provides a minimized context packet, answer its explicit questions directly. If the packet is insufficient, request the specific additional context needed; do not assume missing facts or request a full transcript by default.
 </output>
