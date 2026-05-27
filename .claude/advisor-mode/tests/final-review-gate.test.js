@@ -1,5 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const { spawnSync, spawn } = require('node:child_process');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -117,6 +118,61 @@ function writeFinalReviewArtifacts(root, { verdict = makeVerdict(), evidence = m
     writeJson(path.join(root, '.advisor', 'state', 'final-review.json'), state);
   }
 }
+
+function runFinalReviewGate(input, options = {}) {
+  return spawnSync(process.execPath, [finalReviewGatePath], {
+    input,
+    encoding: 'utf8',
+    env: {
+      ...process.env,
+      ADVISOR_FINAL_REVIEW_GATE_STDIN_TIMEOUT_MS: String(options.stdinTimeoutMs || 100),
+    },
+    timeout: options.processTimeoutMs || 1000,
+  });
+}
+
+function assertBlockingHookOutput(result) {
+  assert.notEqual(result.status, 0);
+  const output = `${result.stdout || ''}\n${result.stderr || ''}`;
+  assert.match(output, /fresh advisor final review/i);
+  assert.match(output, /deny|block|required/i);
+}
+
+test('Stop hook CLI fails closed on empty stdin', () => {
+  assertBlockingHookOutput(runFinalReviewGate(''));
+});
+
+test('Stop hook CLI fails closed on malformed stdin', () => {
+  assertBlockingHookOutput(runFinalReviewGate('{not-json'));
+});
+
+test('Stop hook CLI fails closed when stdin does not end before timeout', async () => {
+  const child = spawn(process.execPath, [finalReviewGatePath], {
+    stdio: ['pipe', 'pipe', 'pipe'],
+    env: {
+      ...process.env,
+      ADVISOR_FINAL_REVIEW_GATE_STDIN_TIMEOUT_MS: '50',
+    },
+  });
+
+  let stdout = '';
+  let stderr = '';
+  child.stdout.setEncoding('utf8');
+  child.stderr.setEncoding('utf8');
+  child.stdout.on('data', (chunk) => {
+    stdout += chunk;
+  });
+  child.stderr.on('data', (chunk) => {
+    stderr += chunk;
+  });
+  child.stdin.write('{');
+
+  const status = await new Promise((resolve) => {
+    child.on('close', (code) => resolve(code));
+  });
+
+  assertBlockingHookOutput({ status, stdout, stderr });
+});
 
 test('explicit non-trivial completion blocks when no fresh final review exists', () => {
   assert.equal(typeof evaluateFinalReviewGate, 'function');
