@@ -305,6 +305,8 @@ function validateExecutorDecision(artifact, verdict) {
     });
     if (typeof decision.recommendation_id !== 'string' || decision.recommendation_id.length === 0) {
       errors.push(`executor_decisions[${index}].recommendation_id must be a non-empty string`);
+    } else if (seenIds.has(decision.recommendation_id)) {
+      errors.push(`duplicate executor decision for recommendation ${decision.recommendation_id}`);
     } else {
       seenIds.add(decision.recommendation_id);
     }
