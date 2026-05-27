@@ -129,9 +129,22 @@ function parseInput(input) {
   }
 }
 
+function writeBlockingStopResponse(reasonCode, message) {
+  process.stdout.write(JSON.stringify(block(reasonCode, message).hookOutput));
+}
+
+function blockInvalidStopInput(reasonCode, message) {
+  writeBlockingStopResponse(reasonCode, message);
+  process.exitCode = 2;
+}
+
 function main() {
   let input = '';
-  const stdinTimeout = setTimeout(() => process.exit(0), 3000);
+  const timeoutMs = Number.parseInt(process.env.ADVISOR_FINAL_REVIEW_GATE_STDIN_TIMEOUT_MS || '3000', 10);
+  const stdinTimeout = setTimeout(() => {
+    blockInvalidStopInput('invalid-stop-hook-input', 'Fresh advisor final review is required before completion because Stop hook input was unavailable.');
+    process.exit(2);
+  }, Number.isFinite(timeoutMs) && timeoutMs > 0 ? timeoutMs : 3000);
   process.stdin.setEncoding('utf8');
   process.stdin.on('data', (chunk) => {
     input += chunk;
@@ -139,7 +152,10 @@ function main() {
   process.stdin.on('end', () => {
     clearTimeout(stdinTimeout);
     const event = parseInput(input);
-    if (!event) process.exit(0);
+    if (!event) {
+      blockInvalidStopInput('invalid-stop-hook-input', 'Fresh advisor final review is required before completion because Stop hook input was empty or malformed.');
+      return;
+    }
     const result = evaluateFinalReviewGate(event);
     if (result.hookOutput) process.stdout.write(JSON.stringify(result.hookOutput));
     if (result.gateAction === 'block') process.exitCode = 2;
