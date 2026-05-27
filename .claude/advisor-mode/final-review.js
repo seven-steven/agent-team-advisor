@@ -245,9 +245,155 @@ function validateVerdict(verdict) {
   };
 }
 
+function validateExecutorDecision(artifact, verdict) {
+  const errors = [];
+
+  if (!artifact || typeof artifact !== 'object' || Array.isArray(artifact)) {
+    return { ok: false, errors: ['executor decision artifact must be an object'] };
+  }
+  if (!verdict || typeof verdict !== 'object' || Array.isArray(verdict)) {
+    return { ok: false, errors: ['verdict must be an object'] };
+  }
+
+  const allowedFields = new Set([
+    'artifact_type',
+    'correlationKey',
+    'verdict_ref',
+    'executor_decisions',
+    'created_at',
+  ]);
+  Object.keys(artifact).forEach((key) => {
+    if (!allowedFields.has(key)) errors.push(`unexpected field: ${key}`);
+  });
+
+  if (artifact.artifact_type !== 'executor-decision') {
+    errors.push('artifact_type must be executor-decision');
+  }
+  if (typeof artifact.correlationKey !== 'string' || artifact.correlationKey.length === 0) {
+    errors.push('correlationKey must be a non-empty string');
+  }
+  if (artifact.correlationKey !== verdict.correlationKey) {
+    errors.push('correlationKey must match verdict.correlationKey');
+  }
+  for (const field of ['verdict_ref', 'created_at']) {
+    if (typeof artifact[field] !== 'string' || artifact[field].length === 0) {
+      errors.push(`${field} must be a non-empty string`);
+    }
+  }
+
+  const decisions = Array.isArray(artifact.executor_decisions) ? artifact.executor_decisions : [];
+  if (!Array.isArray(artifact.executor_decisions)) {
+    errors.push('executor_decisions must be an array');
+  }
+
+  const expectedIds = normalizeRecommendedActions(verdict.recommended_actions).map((action) => action.id);
+  const seenIds = new Set();
+  decisions.forEach((decision, index) => {
+    if (!decision || typeof decision !== 'object' || Array.isArray(decision)) {
+      errors.push(`executor_decisions[${index}] must be an object`);
+      return;
+    }
+    const decisionFields = new Set([
+      'recommendation_id',
+      'disposition',
+      'rationale',
+      'evidence_refs',
+      'decided_at',
+    ]);
+    Object.keys(decision).forEach((key) => {
+      if (!decisionFields.has(key)) errors.push(`executor_decisions[${index}] unexpected field: ${key}`);
+    });
+    if (typeof decision.recommendation_id !== 'string' || decision.recommendation_id.length === 0) {
+      errors.push(`executor_decisions[${index}].recommendation_id must be a non-empty string`);
+    } else {
+      seenIds.add(decision.recommendation_id);
+    }
+    if (!['accepted', 'rejected', 'deferred'].includes(decision.disposition)) {
+      errors.push(`executor_decisions[${index}].disposition must be accepted, rejected, or deferred`);
+    }
+    if (typeof decision.rationale !== 'string' || decision.rationale.length === 0) {
+      errors.push(`executor_decisions[${index}].rationale must be a non-empty string`);
+    }
+    if (!Array.isArray(decision.evidence_refs)) {
+      errors.push(`executor_decisions[${index}].evidence_refs must be an array`);
+    } else {
+      decision.evidence_refs.forEach((ref, refIndex) => {
+        if (typeof ref !== 'string' || ref.length === 0) {
+          errors.push(`executor_decisions[${index}].evidence_refs[${refIndex}] must be a non-empty string`);
+        }
+      });
+    }
+    if (typeof decision.decided_at !== 'string' || decision.decided_at.length === 0) {
+      errors.push(`executor_decisions[${index}].decided_at must be a non-empty string`);
+    }
+  });
+
+  expectedIds.forEach((id) => {
+    if (!seenIds.has(id)) errors.push(`missing executor decision for recommendation ${id}`);
+  });
+  seenIds.forEach((id) => {
+    if (!expectedIds.includes(id)) errors.push(`unexpected executor decision for recommendation ${id}`);
+  });
+
+  return { ok: errors.length === 0, errors };
+}
+
+function writeJson(filePath, value) {
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  fs.writeFileSync(filePath, `${JSON.stringify(value, null, 2)}\n`);
+}
+
+function appendExecutorDecisionAudit(artifact, artifactPath, options = {}) {
+  const auditPath = options.auditPath || path.join(options.root || process.cwd(), '.advisor', 'audit', 'events.jsonl');
+  fs.mkdirSync(path.dirname(auditPath), { recursive: true });
+  fs.appendFileSync(
+    auditPath,
+    `${JSON.stringify({
+      timestamp: new Date().toISOString(),
+      event: 'executor.final_review_decision.recorded',
+      correlationKey: artifact.correlationKey,
+      artifactPath,
+      decisionCount: artifact.executor_decisions.length,
+    })}\n`,
+  );
+}
+
+function recordExecutorDecision(input = {}, options = {}) {
+  const root = options.root || process.cwd();
+  const verdict = input.verdict;
+  const correlationKey = input.correlationKey || (verdict && verdict.correlationKey);
+  const now = input.created_at || new Date().toISOString();
+  const decisions = Array.isArray(input.decisions) ? input.decisions : [];
+  const artifact = {
+    artifact_type: 'executor-decision',
+    correlationKey,
+    verdict_ref: input.verdict_ref || `.advisor/verdicts/${correlationKey}.json`,
+    executor_decisions: decisions.map((decision) => ({
+      recommendation_id: decision.recommendation_id,
+      disposition: decision.disposition,
+      rationale: decision.rationale,
+      evidence_refs: Array.isArray(decision.evidence_refs) ? decision.evidence_refs.slice() : [],
+      decided_at: decision.decided_at || now,
+    })),
+    created_at: now,
+  };
+
+  const validation = validateExecutorDecision(artifact, verdict);
+  if (!validation.ok) {
+    return { ok: false, errors: validation.errors };
+  }
+
+  const artifactPath = path.join(root, '.advisor', 'decisions', 'executor', `${correlationKey}.json`);
+  writeJson(artifactPath, artifact);
+  appendExecutorDecisionAudit(artifact, artifactPath, { ...options, root });
+  return { ok: true, path: artifactPath, artifact };
+}
+
 module.exports = {
   buildContextPacket,
   validateContextPacket,
   normalizeRecommendedActions,
   validateVerdict,
+  recordExecutorDecision,
+  validateExecutorDecision,
 };

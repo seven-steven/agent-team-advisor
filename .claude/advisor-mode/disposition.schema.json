@@ -1,24 +1,75 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "Advisor Mode Human Approval Disposition",
+  "title": "Advisor Mode Executor Decision",
   "type": "object",
   "additionalProperties": false,
-  "required": ["correlationKey", "event", "disposition", "decidedBy", "decidedAt", "rationale", "appliesTo"],
+  "required": [
+    "artifact_type",
+    "correlationKey",
+    "verdict_ref",
+    "executor_decisions",
+    "created_at"
+  ],
   "properties": {
-    "correlationKey": { "type": "string", "minLength": 1 },
-    "event": { "type": "string", "const": "human_approval.disposition" },
-    "disposition": { "type": "string", "enum": ["approve", "reject", "revise", "defer"] },
-    "decidedBy": { "type": "string", "minLength": 1 },
-    "decidedAt": { "type": "string", "minLength": 1 },
-    "rationale": { "type": "string", "minLength": 1 },
-    "appliesTo": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["event"],
-      "properties": {
-        "event": { "type": "string", "const": "human_approval.required" }
+    "artifact_type": {
+      "type": "string",
+      "const": "executor-decision"
+    },
+    "correlationKey": {
+      "type": "string",
+      "minLength": 1
+    },
+    "verdict_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "executor_decisions": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "recommendation_id",
+          "disposition",
+          "rationale",
+          "evidence_refs",
+          "decided_at"
+        ],
+        "properties": {
+          "recommendation_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "disposition": {
+            "type": "string",
+            "enum": [
+              "accepted",
+              "rejected",
+              "deferred"
+            ]
+          },
+          "rationale": {
+            "type": "string",
+            "minLength": 1
+          },
+          "evidence_refs": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "decided_at": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
       }
     },
-    "conditions": { "type": "array", "items": { "type": "string" } }
+    "created_at": {
+      "type": "string",
+      "minLength": 1
+    }
   }
 }
