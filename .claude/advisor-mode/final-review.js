@@ -182,6 +182,12 @@ function validateStringArray(value, field, errors, options = {}) {
   });
 }
 
+function isIsoDateTime(value) {
+  if (typeof value !== 'string' || value.length === 0) return false;
+  const timestamp = Date.parse(value);
+  return Number.isFinite(timestamp) && /^\d{4}-\d{2}-\d{2}T/.test(value);
+}
+
 function validateVerdict(verdict) {
   const schema = readVerdictSchema();
   const errors = [];
@@ -218,6 +224,14 @@ function validateVerdict(verdict) {
     errors.push('recommended_actions must be an array');
   }
   normalizedActions.forEach((action, index) => {
+    const sourceAction = Array.isArray(verdict.recommended_actions) ? verdict.recommended_actions[index] : undefined;
+    if (sourceAction && typeof sourceAction === 'object' && !Array.isArray(sourceAction)) {
+      Object.keys(sourceAction).forEach((key) => {
+        if (!['id', 'description'].includes(key)) {
+          errors.push(`recommended_actions[${index}] unexpected field: ${key}`);
+        }
+      });
+    }
     if (typeof action.id !== 'string' || action.id.length === 0) {
       errors.push(`recommended_actions[${index}].id must be a non-empty string`);
     }
@@ -230,6 +244,9 @@ function validateVerdict(verdict) {
     if (typeof verdict[field] !== 'string' || verdict[field].length === 0) {
       errors.push(`${field} must be a non-empty string`);
     }
+  }
+  if (!isIsoDateTime(verdict.created_at)) {
+    errors.push('created_at must be an ISO 8601 date-time string');
   }
 
   const normalizedVerdict = {
