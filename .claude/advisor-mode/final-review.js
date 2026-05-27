@@ -389,6 +389,136 @@ function recordExecutorDecision(input = {}, options = {}) {
   return { ok: true, path: artifactPath, artifact };
 }
 
+function validateVerificationEvidence(artifact) {
+  const errors = [];
+
+  if (!artifact || typeof artifact !== 'object' || Array.isArray(artifact)) {
+    return { ok: false, errors: ['verification evidence artifact must be an object'] };
+  }
+
+  const allowedFields = new Set([
+    'artifact_type',
+    'correlationKey',
+    'verdict_ref',
+    'executor_decision_ref',
+    'commands',
+    'changed_files',
+    'residual_risks',
+    'created_at',
+  ]);
+  Object.keys(artifact).forEach((key) => {
+    if (!allowedFields.has(key)) errors.push(`unexpected field: ${key}`);
+  });
+
+  if (artifact.artifact_type !== 'verification-evidence') {
+    errors.push('artifact_type must be verification-evidence');
+  }
+  if (typeof artifact.correlationKey !== 'string' || artifact.correlationKey.length === 0) {
+    errors.push('correlationKey must be a non-empty string');
+  }
+  for (const field of ['created_at']) {
+    if (typeof artifact[field] !== 'string' || artifact[field].length === 0) {
+      errors.push(`${field} must be a non-empty string`);
+    }
+  }
+  for (const field of ['verdict_ref', 'executor_decision_ref']) {
+    if (artifact[field] !== undefined && (typeof artifact[field] !== 'string' || artifact[field].length === 0)) {
+      errors.push(`${field} must be a non-empty string when present`);
+    }
+  }
+
+  validateStringArray(artifact.changed_files, 'changed_files', errors);
+  validateStringArray(artifact.residual_risks, 'residual_risks', errors);
+
+  const commands = Array.isArray(artifact.commands) ? artifact.commands : [];
+  if (!Array.isArray(artifact.commands)) {
+    errors.push('commands must be an array');
+  } else if (artifact.commands.length === 0) {
+    errors.push('commands must include at least 1 item');
+  }
+
+  const allowedPurposes = new Set(['test', 'typecheck', 'lint', 'smoke', 'assertion', 'manual-check-summary']);
+  commands.forEach((command, index) => {
+    if (!command || typeof command !== 'object' || Array.isArray(command)) {
+      errors.push(`commands[${index}] must be an object`);
+      return;
+    }
+    const commandFields = new Set(['purpose', 'command', 'exit_status', 'summary', 'timestamp']);
+    Object.keys(command).forEach((key) => {
+      if (!commandFields.has(key)) errors.push(`commands[${index}] unexpected field: ${key}`);
+    });
+    if (!allowedPurposes.has(command.purpose)) {
+      errors.push(`commands[${index}].purpose must be test, typecheck, lint, smoke, assertion, or manual-check-summary`);
+    }
+    for (const field of ['command', 'summary', 'timestamp']) {
+      if (typeof command[field] !== 'string' || command[field].length === 0) {
+        errors.push(`commands[${index}].${field} must be a non-empty string`);
+      }
+    }
+    if (!['number', 'string'].includes(typeof command.exit_status) || command.exit_status === '') {
+      errors.push(`commands[${index}].exit_status must be a number or non-empty string`);
+    }
+  });
+
+  return { ok: errors.length === 0, errors };
+}
+
+function appendVerificationEvidenceAudit(artifact, artifactPath, options = {}) {
+  const auditPath = options.auditPath || path.join(options.root || process.cwd(), '.advisor', 'audit', 'events.jsonl');
+  fs.mkdirSync(path.dirname(auditPath), { recursive: true });
+  fs.appendFileSync(
+    auditPath,
+    `${JSON.stringify({
+      timestamp: new Date().toISOString(),
+      event: 'verification.evidence.recorded',
+      correlationKey: artifact.correlationKey,
+      artifactPath,
+      commandCount: artifact.commands.length,
+      changedFileCount: artifact.changed_files.length,
+      residualRiskCount: artifact.residual_risks.length,
+    })}\n`,
+  );
+}
+
+function recordVerificationEvidence(input = {}, options = {}) {
+  const root = options.root || process.cwd();
+  const correlationKey = input.correlationKey;
+  const now = input.created_at || new Date().toISOString();
+  const artifact = {
+    artifact_type: 'verification-evidence',
+    correlationKey,
+    commands: Array.isArray(input.commands)
+      ? input.commands.map((command) => ({
+          purpose: command.purpose,
+          command: command.command,
+          exit_status: command.exit_status,
+          summary: command.summary,
+          timestamp: command.timestamp,
+        }))
+      : input.commands,
+    changed_files: Array.isArray(input.changed_files) ? input.changed_files.slice() : input.changed_files,
+    residual_risks: Array.isArray(input.residual_risks) ? input.residual_risks.slice() : input.residual_risks,
+    created_at: now,
+  };
+
+  if (input.verdict_ref !== undefined) artifact.verdict_ref = input.verdict_ref;
+  if (input.executor_decision_ref !== undefined) artifact.executor_decision_ref = input.executor_decision_ref;
+
+  const validation = validateVerificationEvidence(artifact);
+  if (!validation.ok) {
+    return { ok: false, errors: validation.errors };
+  }
+
+  const artifactPath = path.join(root, '.advisor', 'evidence', 'verification', `${correlationKey}.json`);
+  if (fs.existsSync(artifactPath)) {
+    return { ok: false, errors: [`verification evidence already exists for correlationKey: ${correlationKey}`], path: artifactPath };
+  }
+
+  writeJson(artifactPath, artifact);
+  appendVerificationEvidenceAudit(artifact, artifactPath, { ...options, root });
+  return { ok: true, path: artifactPath, artifact };
+}
+
 module.exports = {
   buildContextPacket,
   validateContextPacket,
@@ -396,4 +526,6 @@ module.exports = {
   validateVerdict,
   recordExecutorDecision,
   validateExecutorDecision,
+  recordVerificationEvidence,
+  validateVerificationEvidence,
 };
