@@ -109,7 +109,7 @@ function createLiveGatewayClient(options = {}) {
   const endpoint = normalizeMessagesEndpoint(baseUrl);
   const anthropicVersion = options.anthropicVersion || '2023-06-01';
 
-  async function postMessages(route, body) {
+  async function postMessages(body) {
     const response = await fetchImpl(endpoint, {
       method: 'POST',
       headers: {
@@ -151,22 +151,22 @@ function createLiveGatewayClient(options = {}) {
 
   return {
     async baseMessage(route) {
-      return postMessages(route, baseBody(route));
+      return postMessages(baseBody(route));
     },
     async stream(route) {
-      return postMessages(route, baseBody(route, { stream: true }));
+      return postMessages(baseBody(route, { stream: true }));
     },
     async toolUse(route) {
-      return postMessages(route, baseBody(route, {
+      return postMessages(baseBody(route, {
         tools: [{ name: 'advisor_echo', description: 'Echo conformance input.', input_schema: { type: 'object', properties: { value: { type: 'string' } }, required: ['value'] } }],
         tool_choice: { type: 'tool', name: 'advisor_echo' },
       }));
     },
     async usage(route) {
-      return postMessages(route, baseBody(route));
+      return postMessages(baseBody(route));
     },
     async errorShape(route) {
-      return postMessages({ ...route, model: '__advisor_mode_invalid_model__' }, baseBody({ ...route, model: '__advisor_mode_invalid_model__' }));
+      return postMessages(baseBody({ ...route, model: '__advisor_mode_invalid_model__' }));
     },
   };
 }
