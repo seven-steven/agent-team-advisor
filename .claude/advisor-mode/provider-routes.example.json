@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "routes": {
+    "sonnet": {
+      "provider": "openrouter",
+      "model": "z-ai/glm-4.5",
+      "endpointRef": "openrouter-anthropic",
+      "credentialEnv": "ANTHROPIC_AUTH_TOKEN",
+      "requiredConformance": ["base-message", "streaming", "tool-use", "usage-fields", "error-shape"],
+      "metadata": {
+        "role": "executor",
+        "distribution": "repo-local-fallback",
+        "verification": "operator-configured-openrouter-route"
+      }
+    },
+    "opus": {
+      "provider": "openrouter",
+      "model": "openai/gpt-5.5",
+      "endpointRef": "openrouter-anthropic",
+      "credentialEnv": "ANTHROPIC_AUTH_TOKEN",
+      "requiredConformance": ["base-message", "streaming", "tool-use", "usage-fields", "error-shape"],
+      "metadata": {
+        "role": "advisor",
+        "distribution": "repo-local-fallback",
+        "verification": "operator-configured-openrouter-route"
+      }
+    },
+    "haiku": {
+      "provider": "openrouter",
+      "model": "anthropic/claude-3.5-haiku",
+      "endpointRef": "openrouter-anthropic",
+      "credentialEnv": "ANTHROPIC_AUTH_TOKEN",
+      "requiredConformance": ["base-message", "usage-fields", "error-shape"],
+      "metadata": {
+        "role": "classification",
+        "distribution": "repo-local-fallback",
+        "verification": "operator-configured-openrouter-route"
+      }
+    }
+  }
+}

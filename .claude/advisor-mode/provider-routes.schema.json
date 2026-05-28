@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Advisor Mode Provider Routes",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "routes"],
+  "properties": {
+    "schemaVersion": { "type": "integer", "const": 1 },
+    "routes": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["provider", "model", "endpointRef", "requiredConformance"],
+        "properties": {
+          "provider": { "type": "string", "minLength": 1 },
+          "model": { "type": "string", "minLength": 1 },
+          "endpointRef": { "type": "string", "minLength": 1 },
+          "credentialEnv": { "type": "string", "minLength": 1 },
+          "requiredConformance": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": ["base-message", "streaming", "tool-use", "usage-fields", "error-shape"]
+            },
+            "uniqueItems": true
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": {
+              "type": ["string", "number", "boolean"]
+            }
+          }
+        }
+      }
+    }
+  }
+}

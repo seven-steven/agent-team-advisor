@@ -171,7 +171,7 @@ test('ROUT-02 executor runtime hook records sanitized sonnet route artifact and 
       headers: { authorization: 'Bearer sk-secret' },
       requestBody: { body: 'do not record this' },
     },
-    { root, now: '2026-05-28T00:00:00.000Z' },
+    { root, runtimeRoot: path.join(root, '.advisor'), now: '2026-05-28T00:00:00.000Z' },
   );
 
   assert.equal(result.ok, true);

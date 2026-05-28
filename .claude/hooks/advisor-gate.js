@@ -4,6 +4,10 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 const { runtimePath } = require('../advisor-mode/runtime-paths.js');
 const { normalizeFailureSignature } = require('./advisor-failure-tracker.js');
+const {
+  loadRouteConfig,
+  resolveRoute,
+} = require('../advisor-mode/provider-routing.js');
 
 const GATED_MATCHER_TOOLS = new Set(['Bash', 'Edit', 'Write', 'MultiEdit']);
 const READ_ONLY_SOURCE = 'read-only-advisor';
@@ -229,7 +233,50 @@ function buildAdvisorProducerInstruction(requestPath, recommendationPath) {
   };
 }
 
-function buildRequest(event, classes, rule, paths) {
+function loadRuntimeRouteConfig(options = {}) {
+  const root = getRoot(options);
+  const localPath = path.join(root, '.claude', 'advisor-mode', 'provider-routes.json');
+  const examplePath = path.join(root, '.claude', 'advisor-mode', 'provider-routes.example.json');
+  const routeConfigPath = fs.existsSync(localPath) ? localPath : examplePath;
+  return loadRouteConfig(routeConfigPath, { root });
+}
+
+function buildRuntimeRouteMetadata(input = {}, options = {}) {
+  const requestedAlias = input.requestedAlias || 'opus';
+  const loaded = loadRuntimeRouteConfig(options);
+  if (!loaded.ok) {
+    return {
+      ok: false,
+      requestedAlias,
+      routeConfigPath: loaded.configPath,
+      conformanceStatus: 'unknown',
+      reasonCode: 'route-config-load-failed',
+      errors: loaded.errors,
+    };
+  }
+  const resolution = resolveRoute(loaded.config, requestedAlias, { routeConfigPath: loaded.configPath });
+  if (!resolution.ok) {
+    return {
+      ok: false,
+      requestedAlias,
+      routeConfigPath: loaded.configPath,
+      conformanceStatus: 'unknown',
+      reasonCode: resolution.reasonCode,
+      errors: resolution.errors,
+    };
+  }
+  return {
+    ok: true,
+    requestedAlias,
+    resolvedProvider: resolution.provider,
+    resolvedModel: resolution.model,
+    endpointRef: resolution.endpointRef,
+    routeConfigPath: loaded.configPath,
+    conformanceStatus: resolution.conformanceStatus || 'unchecked',
+  };
+}
+
+function buildRequest(event, classes, rule, paths, options = {}) {
   const risk = rule.risk || 'high';
   const request = {
     correlationKey: paths.correlationKey,
@@ -244,6 +291,7 @@ function buildRequest(event, classes, rule, paths) {
     consultationTiming: 'before-proceed',
     requestPath: paths.requestPath,
     recommendationPath: paths.recommendationPath,
+    routeResolution: buildRuntimeRouteMetadata({ requestedAlias: event.requestedAlias || 'opus' }, options),
     advisorProducer: buildAdvisorProducerInstruction(paths.requestPath, paths.recommendationPath),
   };
   if (rule.auditLabel) request.auditLabel = rule.auditLabel;
@@ -529,7 +577,7 @@ function evaluateGatePolicy(rawEvent, options = {}) {
   if (!rule) return { gateAction: 'none', classes };
 
   const paths = getConsultationPaths(event, options);
-  const request = buildRequest(event, classes, rule, paths);
+  const request = buildRequest(event, classes, rule, paths, options);
   if (rule.gateAction === 'human-approval') {
     const decisionPacket = buildDecisionPacket(
       {
@@ -696,6 +744,7 @@ module.exports = {
   readAdvisorRecommendation,
   buildAdvisorProducerInstruction,
   validateAdvisorRecommendation,
+  buildRuntimeRouteMetadata,
   buildDecisionPacket,
   writeDisposition,
   readDisposition,
