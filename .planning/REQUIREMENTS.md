@@ -101,10 +101,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | GATE-06     | Phase 2 | Pending  |
 | VERD-01     | Phase 3 | Complete |
 | VERD-02     | Phase 3 | Complete |
-| ROUT-01     | Phase 4 | Pending  |
-| ROUT-02     | Phase 4 | Pending  |
+| ROUT-01     | Phase 4 | Complete |
+| ROUT-02     | Phase 4 | Complete |
 | ROUT-03     | Phase 4 | Pending  |
-| ROUT-04     | Phase 4 | Pending  |
+| ROUT-04     | Phase 4 | Complete |
 | AUDT-01     | Phase 5 | Pending  |
 | AUDT-02     | Phase 3 | Complete |
 | AUDT-03     | Phase 5 | Pending  |

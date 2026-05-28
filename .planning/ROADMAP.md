@@ -113,7 +113,7 @@ Plans:
 2. Project maintainer can configure the reference route of GLM as executor and GPT-5.5 as advisor without changing workflow logic.
 3. Project maintainer can run a conformance check that validates required Anthropic-compatible message, tool, streaming, and usage behaviors before enabling advisor-critical flows.
 4. User can inspect which concrete provider and model served each executor or advisor call.
-   **Plans**: TBD
+   **Plans**: 1/2 plans complete
 
 ### Phase 5: Audit, Budget, and Operator Recovery
 
@@ -140,5 +140,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | 1. Repo-Scoped Advisor Foundation            | 4/4            | Complete    | 2026-05-19 |
 | 2. Enforced Trigger Gates                    | 6/6            | Complete    | 2026-05-22 |
 | 3. Verdict Handoff and Verification Evidence | 7/7            | Complete    | 2026-05-27 |
-| 4. Provider Routing and Conformance          | 0/TBD          | Not started | -          |
+| 4. Provider Routing and Conformance          | 1/2            | In Progress | -          |
 | 5. Audit, Budget, and Operator Recovery      | 0/TBD          | Not started | -          |
