@@ -109,3 +109,53 @@ node --test .claude/advisor-mode/tests/*.test.js
 ### Deferred phase boundaries
 
 Provider routing and conformance validation remain Phase 4 scope. Budgets, rollback, and broader audit exploration remain Phase 5 scope.
+
+## Phase 4 Provider Routing and Conformance
+
+Phase 4 keeps routing thin and audit-first: workflow code uses semantic aliases, while provider route files map those aliases to concrete provider/model targets for operator inspection.
+
+### Route file
+
+- `.claude/advisor-mode/provider-routes.example.json` declares `sonnet`, `opus`, and `haiku` route defaults.
+- Each route records provider ID, model ID, `endpointRef`, credential environment variable name, and required conformance checks.
+- Route files store environment variable names only. Do not commit auth token values, headers, or request bodies.
+
+### Conformance command
+
+Run targeted local conformance before trusting advisor-critical routes:
+
+```bash
+ANTHROPIC_BASE_URL=https://openrouter.ai/api \
+ANTHROPIC_AUTH_TOKEN=<operator-owned-token> \
+node .claude/advisor-mode/provider-conformance.js --alias opus --alias sonnet
+```
+
+For deterministic local tests without a live gateway, use the mocked mode covered by the test suite:
+
+```bash
+node .claude/advisor-mode/provider-conformance.js --mock pass --alias opus
+```
+
+The command validates exactly the advisor-critical Anthropic-compatible behaviors required by Phase 4: base message response shape, streaming event sequence, tool-use response shape, usage fields, and error shape. Unsupported or malformed behavior records `status: "fail"` and exits non-zero; there is no silent advisor-critical fallback.
+
+### Conformance artifacts
+
+Successful and failed runs write sanitized operator evidence:
+
+- `.advisor/state/provider-conformance.json` — latest route-aware conformance artifact.
+- `.advisor/audit/events.jsonl` — append-only `provider_conformance.completed` audit event.
+
+Artifacts include requested alias, resolved provider/model, endpoint reference, per-check status, and timestamps. They omit auth headers, bearer tokens, full request bodies, prompts, and credential values.
+
+### Live verification checkpoint
+
+Before enabling a live provider route, confirm current gateway documentation and operator configuration for:
+
+1. Anthropic-compatible Messages API base request/response shape.
+2. Streaming event shape.
+3. Tool-use request/response shape.
+4. Usage metadata fields.
+5. Representative Anthropic-like error response shape.
+6. `ANTHROPIC_BASE_URL` and `ANTHROPIC_AUTH_TOKEN` or provider-specific equivalent environment variables.
+
+Phase 4 stops at routing and targeted conformance. Budget controls, rollback controls, and broader install doctor workflows remain Phase 5 scope.

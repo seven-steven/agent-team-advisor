@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Advisor Mode Provider Conformance Artifact",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["artifact_type", "event", "checked_at", "status", "routes"],
+  "properties": {
+    "artifact_type": { "type": "string", "const": "provider-conformance" },
+    "event": { "type": "string", "const": "provider_conformance.completed" },
+    "checked_at": { "type": "string", "format": "date-time" },
+    "status": { "type": "string", "enum": ["pass", "fail"] },
+    "routes": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["requestedAlias", "resolvedProvider", "resolvedModel", "endpointRef", "routeConfigPath", "checkedAt", "status", "checks"],
+        "properties": {
+          "requestedAlias": { "type": "string", "minLength": 1 },
+          "resolvedProvider": { "type": "string", "minLength": 1 },
+          "resolvedModel": { "type": "string", "minLength": 1 },
+          "endpointRef": { "type": "string", "minLength": 1 },
+          "routeConfigPath": { "type": "string", "minLength": 1 },
+          "checkedAt": { "type": "string", "format": "date-time" },
+          "status": { "type": "string", "enum": ["pass", "fail"] },
+          "checks": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["name", "status", "evidence"],
+              "properties": {
+                "name": { "type": "string", "enum": ["base-message", "streaming", "tool-use", "usage-fields", "error-shape"] },
+                "status": { "type": "string", "enum": ["pass", "fail"] },
+                "evidence": { "type": "object" },
+                "errorShape": { "type": "object" }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
