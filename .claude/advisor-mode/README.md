@@ -127,7 +127,7 @@ Run targeted local conformance before trusting advisor-critical routes:
 ```bash
 ANTHROPIC_BASE_URL=https://openrouter.ai/api \
 ANTHROPIC_AUTH_TOKEN=<operator-owned-token> \
-node .claude/advisor-mode/provider-conformance.js --alias opus --alias sonnet
+node .claude/advisor-mode/provider-conformance.js --live --alias opus --alias sonnet
 ```
 
 For deterministic local tests without a live gateway, use the mocked mode covered by the test suite:
@@ -136,7 +136,7 @@ For deterministic local tests without a live gateway, use the mocked mode covere
 node .claude/advisor-mode/provider-conformance.js --mock pass --alias opus
 ```
 
-The command validates exactly the advisor-critical Anthropic-compatible behaviors required by Phase 4: base message response shape, streaming event sequence, tool-use response shape, usage fields, and error shape. Unsupported or malformed behavior records `status: "fail"` and exits non-zero; there is no silent advisor-critical fallback.
+The command validates exactly the advisor-critical Anthropic-compatible behaviors required by Phase 4: base message response shape, streaming event sequence, tool-use response shape, usage fields, and error shape. `--live` performs real HTTP requests against `ANTHROPIC_BASE_URL` using `ANTHROPIC_AUTH_TOKEN`; unsupported or malformed behavior records `status: "fail"` and exits non-zero. There is no silent advisor-critical fallback.
 
 ### Conformance artifacts
 
@@ -145,7 +145,7 @@ Successful and failed runs write sanitized operator evidence:
 - `.advisor/state/provider-conformance.json` — latest route-aware conformance artifact.
 - `.advisor/audit/events.jsonl` — append-only `provider_conformance.completed` audit event.
 
-Artifacts include requested alias, resolved provider/model, endpoint reference, per-check status, and timestamps. They omit auth headers, bearer tokens, full request bodies, prompts, and credential values.
+Artifacts include requested alias, configured route metadata, live response-derived served route evidence when the gateway returns a model/provider, per-check status, and timestamps. They omit auth headers, bearer tokens, full request bodies, prompts, and credential values. Conformance `servedRoute` is diagnostic evidence for the conformance request only; advisor/executor runtime ROUT-02 source-of-truth served-route wiring is handled by the follow-on runtime observability plan.
 
 ### Live verification checkpoint
 

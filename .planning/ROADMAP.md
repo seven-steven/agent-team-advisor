@@ -140,5 +140,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | 1. Repo-Scoped Advisor Foundation            | 4/4            | Complete    | 2026-05-19 |
 | 2. Enforced Trigger Gates                    | 6/6            | Complete    | 2026-05-22 |
 | 3. Verdict Handoff and Verification Evidence | 7/7            | Complete    | 2026-05-27 |
-| 4. Provider Routing and Conformance          | 2/2            | Gaps found  | -          |
+| 4. Provider Routing and Conformance          | 3/4 | In Progress|  |
 | 5. Audit, Budget, and Operator Recovery      | 0/TBD          | Not started | -          |
