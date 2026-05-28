@@ -16,7 +16,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 1: Repo-Scoped Advisor Foundation** - Maintainers can install project-local advisor assets with enforced executor/advisor role boundaries. (completed 2026-05-19)
 - [x] **Phase 2: Enforced Trigger Gates** - Users can rely on policy-driven advisor and human approval gates that host-block risky first attempts and require explicit retry after recommendation or disposition artifacts exist. (gap closure planned 2026-05-22) (completed 2026-05-22)
 - [x] **Phase 3: Verdict Handoff and Verification Evidence** - Users receive structured advisor guidance, executor rationale, minimized context handoffs, and verification evidence. (completed 2026-05-27)
-- [x] **Phase 4: Provider Routing and Conformance** - Maintainers can route Claude semantic aliases to third-party models and validate provider compatibility before critical flows. (completed 2026-05-28)
+- [ ] **Phase 4: Provider Routing and Conformance** - Maintainers can route Claude semantic aliases to third-party models and validate provider compatibility before critical flows. (verification gaps found 2026-05-28)
 - [ ] **Phase 5: Audit, Budget, and Operator Recovery** - Users can inspect correlated audit history, cap advisor cost/latency, validate installation, and disable enforcement safely.
 
 ## Phase Details
@@ -113,7 +113,7 @@ Plans:
 2. Project maintainer can configure the reference route of GLM as executor and GPT-5.5 as advisor without changing workflow logic.
 3. Project maintainer can run a conformance check that validates required Anthropic-compatible message, tool, streaming, and usage behaviors before enabling advisor-critical flows.
 4. User can inspect which concrete provider and model served each executor or advisor call.
-   **Plans**: 1/2 plans complete
+   **Plans**: 2/2 plans executed; verification gaps remain
 
 ### Phase 5: Audit, Budget, and Operator Recovery
 
@@ -140,5 +140,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | 1. Repo-Scoped Advisor Foundation            | 4/4            | Complete    | 2026-05-19 |
 | 2. Enforced Trigger Gates                    | 6/6            | Complete    | 2026-05-22 |
 | 3. Verdict Handoff and Verification Evidence | 7/7            | Complete    | 2026-05-27 |
-| 4. Provider Routing and Conformance          | 2/2 | Complete   | 2026-05-28 |
+| 4. Provider Routing and Conformance          | 2/2            | Gaps found  | -          |
 | 5. Audit, Budget, and Operator Recovery      | 0/TBD          | Not started | -          |
