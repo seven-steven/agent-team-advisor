@@ -107,7 +107,7 @@ function assertNoSecrets(value) {
   assert.doesNotMatch(serialized, /authorization/i);
   assert.doesNotMatch(serialized, /headers/i);
   assert.doesNotMatch(serialized, /requestBody|body|prompt|messages/i);
-  assert.doesNotMatch(serialized, /ANTHROPIC_AUTH_TOKEN_VALUE/);
+  assert.doesNotMatch(serialized, /TOKEN_PLACEHOLDER/);
 }
 
 function createPassingClient() {
@@ -142,10 +142,10 @@ function createPassingClient() {
 test('ROUT-03 createLiveGatewayClient requires ANTHROPIC_BASE_URL without exposing token values', () => {
   assert.equal(typeof createLiveGatewayClient, 'function');
   assert.throws(
-    () => createLiveGatewayClient({ env: { ANTHROPIC_AUTH_TOKEN: 'ANTHROPIC_AUTH_TOKEN_VALUE' }, fetchImpl: async () => {} }),
+    () => createLiveGatewayClient({ env: { ANTHROPIC_AUTH_TOKEN: 'TEST_TOKEN_PLACEHOLDER' }, fetchImpl: async () => {} }),
     (error) => {
       assert.match(error.message, /ANTHROPIC_BASE_URL/);
-      assert.doesNotMatch(error.message, /ANTHROPIC_AUTH_TOKEN_VALUE/);
+      assert.doesNotMatch(error.message, /TEST_TOKEN_PLACEHOLDER/);
       return true;
     },
   );
@@ -154,7 +154,7 @@ test('ROUT-03 createLiveGatewayClient requires ANTHROPIC_BASE_URL without exposi
 test('ROUT-03 live gateway client sends Anthropic-compatible message requests with route model and safe headers', async () => {
   const { calls, fetchImpl } = createLiveFetchRecorder();
   const client = createLiveGatewayClient({
-    env: { ANTHROPIC_BASE_URL: 'https://gateway.example/api/', ANTHROPIC_AUTH_TOKEN: 'ANTHROPIC_AUTH_TOKEN_VALUE' },
+    env: { ANTHROPIC_BASE_URL: 'https://gateway.example/api/', ANTHROPIC_AUTH_TOKEN: 'TEST_TOKEN_PLACEHOLDER' },
     fetchImpl,
   });
 
@@ -164,7 +164,7 @@ test('ROUT-03 live gateway client sends Anthropic-compatible message requests wi
   assert.equal(calls.length, 1);
   assert.equal(calls[0].url, 'https://gateway.example/api/v1/messages');
   assert.equal(calls[0].request.method, 'POST');
-  assert.equal(calls[0].request.headers.authorization, 'Bearer ANTHROPIC_AUTH_TOKEN_VALUE');
+  assert.equal(calls[0].request.headers.authorization, 'Bearer TEST_TOKEN_PLACEHOLDER');
   assert.equal(calls[0].request.headers['anthropic-version'], '2023-06-01');
   assert.equal(calls[0].request.headers['content-type'], 'application/json');
   assert.equal(calls[0].body.model, 'configured/model');
@@ -179,7 +179,7 @@ test('ROUT-03 runConformance live mode uses mocked fetch for all required checks
     {
       root,
       fetchImpl,
-      env: { ANTHROPIC_BASE_URL: 'https://gateway.example/api', ANTHROPIC_AUTH_TOKEN: 'ANTHROPIC_AUTH_TOKEN_VALUE' },
+      env: { ANTHROPIC_BASE_URL: 'https://gateway.example/api', ANTHROPIC_AUTH_TOKEN: 'TEST_TOKEN_PLACEHOLDER' },
       now: '2026-05-28T00:00:00.000Z',
     },
   );
@@ -215,13 +215,13 @@ test('ROUT-03 live CLI fails closed when gateway returns malformed Anthropic res
     env: {
       ...process.env,
       ANTHROPIC_BASE_URL: 'https://gateway.example/api',
-      ANTHROPIC_AUTH_TOKEN: 'ANTHROPIC_AUTH_TOKEN_VALUE',
+      ANTHROPIC_AUTH_TOKEN: 'TEST_TOKEN_PLACEHOLDER',
     },
   });
 
   assert.notEqual(cli.status, 0);
-  assert.doesNotMatch(cli.stdout, /ANTHROPIC_AUTH_TOKEN_VALUE/);
-  assert.doesNotMatch(cli.stderr, /ANTHROPIC_AUTH_TOKEN_VALUE/);
+  assert.doesNotMatch(cli.stdout, /TEST_TOKEN_PLACEHOLDER/);
+  assert.doesNotMatch(cli.stderr, /TEST_TOKEN_PLACEHOLDER/);
   assertNoSecrets(readJson(path.join(root, '.advisor/state/provider-conformance.json')));
 });
 
@@ -273,7 +273,7 @@ test('ROUT-03 malformed usage stream tool or error shape fails conformance and C
 test('ROUT-02 conformance artifact records resolved metadata and rejects secret leakage', async () => {
   const root = makeTempRoot();
   const result = await runConformance(
-    { aliases: ['opus'], headers: { authorization: 'Bearer sk-secret' }, requestBody: { messages: ['secret'] }, credentialValue: 'ANTHROPIC_AUTH_TOKEN_VALUE' },
+    { aliases: ['opus'], headers: { authorization: 'Bearer TEST_TOKEN_PLACEHOLDER' }, requestBody: { messages: ['secret'] }, credentialValue: 'TEST_TOKEN_PLACEHOLDER' },
     { root, client: createPassingClient(), now: '2026-05-28T00:00:00.000Z' },
   );
   const artifact = buildConformanceArtifact(result);

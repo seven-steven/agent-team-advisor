@@ -15,11 +15,32 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["requestedAlias", "resolvedProvider", "resolvedModel", "endpointRef", "routeConfigPath", "checkedAt", "status", "checks"],
+        "required": ["requestedAlias", "resolvedProvider", "resolvedModel", "configuredRoute", "servedRoute", "endpointRef", "routeConfigPath", "checkedAt", "status", "checks"],
         "properties": {
           "requestedAlias": { "type": "string", "minLength": 1 },
           "resolvedProvider": { "type": "string", "minLength": 1 },
           "resolvedModel": { "type": "string", "minLength": 1 },
+          "configuredRoute": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["provider", "model", "endpointRef"],
+            "properties": {
+              "provider": { "type": "string", "minLength": 1 },
+              "model": { "type": "string", "minLength": 1 },
+              "endpointRef": { "type": "string", "minLength": 1 }
+            }
+          },
+          "servedRoute": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["observed"],
+            "properties": {
+              "observed": { "type": "boolean" },
+              "provider": { "type": "string", "minLength": 1 },
+              "model": { "type": "string", "minLength": 1 },
+              "reasonCode": { "type": "string", "minLength": 1 }
+            }
+          },
           "endpointRef": { "type": "string", "minLength": 1 },
           "routeConfigPath": { "type": "string", "minLength": 1 },
           "checkedAt": { "type": "string", "format": "date-time" },
