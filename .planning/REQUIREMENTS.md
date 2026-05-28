@@ -30,9 +30,9 @@ Requirements for initial release. Each maps to roadmap phases.
 ### Routing & Models
 
 - [ ] **ROUT-01**: Project maintainer can map Claude semantic aliases such as sonnet, opus, and haiku to third-party models through Anthropic-compatible provider settings
-- [ ] **ROUT-02**: User can inspect which concrete provider and model served each executor or advisor call
-- [ ] **ROUT-03**: Project maintainer can run a conformance check that validates the selected gateway/provider against required Anthropic-compatible message, tool, streaming, and usage behaviors before enabling advisor-critical flows
-- [ ] **ROUT-04**: Project maintainer can configure the reference route of GLM as executor and GPT-5.5 as advisor without changing workflow logic
+- [x] **ROUT-02**: User can inspect which concrete provider and model served each executor or advisor call
+- [x] **ROUT-03**: Project maintainer can run a conformance check that validates the selected gateway/provider against required Anthropic-compatible message, tool, streaming, and usage behaviors before enabling advisor-critical flows
+- [x] **ROUT-04**: Project maintainer can configure the reference route of GLM as executor and GPT-5.5 as advisor without changing workflow logic
 
 ### Audit & Verification
 
@@ -103,7 +103,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | VERD-02     | Phase 3 | Complete |
 | ROUT-01     | Phase 4 | Complete |
 | ROUT-02     | Phase 4 | Complete |
-| ROUT-03     | Phase 4 | Pending  |
+| ROUT-03     | Phase 4 | Complete |
 | ROUT-04     | Phase 4 | Complete |
 | AUDT-01     | Phase 5 | Pending  |
 | AUDT-02     | Phase 3 | Complete |
