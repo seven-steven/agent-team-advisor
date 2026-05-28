@@ -4,6 +4,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 
+const { runtimePath } = require('../runtime-paths.js');
 const {
   classifyPathClass,
   evaluateGatePolicy,
@@ -15,8 +16,14 @@ const {
 const repoRoot = path.resolve(__dirname, '..', '..', '..');
 const policy = JSON.parse(fs.readFileSync(path.join(repoRoot, '.claude/advisor-mode/policy.example.json'), 'utf8'));
 
-function makeTempRoot() {
-  return fs.mkdtempSync(path.join(os.tmpdir(), 'advisor-mode-protected-'));
+function makeTempRoot(hooks = { advisor_mode: true, advisor_mode_strict: true }) {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'advisor-mode-protected-'));
+  fs.mkdirSync(path.join(root, '.planning'), { recursive: true });
+  fs.writeFileSync(
+    path.join(root, '.planning', 'config.json'),
+    JSON.stringify({ hooks }, null, 2) + '\n',
+  );
+  return root;
 }
 
 function writeRecommendation(recommendationPath, request) {
@@ -133,7 +140,7 @@ test('critical protected changes require advisor recommendation before human pac
   assert.equal(packet.requiresExplicitRetry, true);
   assert.equal(packet.auditLabel, 'protected-surface.review');
   assert.equal(packet.advisorRecommendation.correlationKey, first.correlationKey);
-  assert.match(packet.dispositionPath, /\.advisor\/decisions\/dispositions\/advisor-consultation-/);
+  assert.match(packet.dispositionPath, /advisor-mode.*decisions[\\/]dispositions[\\/]advisor-consultation-/);
 });
 
 test('evaluateGatePolicy unlocks protected human approval retry after disposition', () => {
@@ -201,7 +208,7 @@ test('critical protected re-entry requires matching approve reject revise or def
   assert.equal(evaluateHumanGateReentry(packet, { root }).workflowGateStatus, 'blocked-pending-human');
 
   for (const disposition of ['approve', 'reject', 'revise', 'defer']) {
-    const dispositionPath = path.join(root, '.advisor', 'decisions', 'dispositions', `${packet.correlationKey}-${disposition}.json`);
+    const dispositionPath = runtimePath(root, ['decisions', 'dispositions', `${packet.correlationKey}-${disposition}.json`]);
     const packetForDisposition = { ...packet, dispositionPath };
     writeDisposition(
       {

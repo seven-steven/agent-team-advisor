@@ -7,7 +7,7 @@ const path = require('node:path');
 const claudeRoot = path.resolve(__dirname, '..', '..');
 const executorPath = path.join(claudeRoot, 'agents', 'executor-guidance.md');
 const boundaryHookPath = path.join(claudeRoot, 'hooks', 'advisor-boundary-check.js');
-const { validateAdvisorBoundary } = require(boundaryHookPath);
+const { isAdvisorModeEnabled, validateAdvisorBoundary } = require(boundaryHookPath);
 
 function makeTempAdvisor(toolsLine) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'advisor-boundary-'));
@@ -32,6 +32,11 @@ test('executor guidance keeps implementation tools and workspace mutation with e
   assert.match(source, /Edit/i);
   assert.match(source, /MultiEdit/i);
   assert.match(source, /advisor mode consultations are advisory and read-only/i);
+});
+
+test('advisor mode is disabled by default when config is absent', () => {
+  const root = makeTempAdvisor('Read, Grep, Glob');
+  assert.equal(isAdvisorModeEnabled(root), false);
 });
 
 test('validateAdvisorBoundary reports mutating advisor tools', () => {

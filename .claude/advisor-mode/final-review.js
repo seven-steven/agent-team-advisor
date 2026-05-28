@@ -1,5 +1,6 @@
 const fs = require('node:fs');
 const path = require('node:path');
+const { runtimePath } = require('./runtime-paths.js');
 
 const VERDICT_SCHEMA_PATH = path.join(__dirname, 'verdict.schema.json');
 const VALID_VERDICT_VALUES = {
@@ -363,7 +364,8 @@ function writeJson(filePath, value) {
 }
 
 function appendExecutorDecisionAudit(artifact, artifactPath, options = {}) {
-  const auditPath = options.auditPath || path.join(options.root || process.cwd(), '.advisor', 'audit', 'events.jsonl');
+  const root = options.root || process.cwd();
+  const auditPath = options.auditPath || runtimePath(root, ['audit', 'events.jsonl'], options);
   fs.mkdirSync(path.dirname(auditPath), { recursive: true });
   fs.appendFileSync(
     auditPath,
@@ -386,7 +388,7 @@ function recordExecutorDecision(input = {}, options = {}) {
   const artifact = {
     artifact_type: 'executor-decision',
     correlationKey,
-    verdict_ref: input.verdict_ref || `.advisor/verdicts/${correlationKey}.json`,
+    verdict_ref: input.verdict_ref || runtimePath(options.root || process.cwd(), ['verdicts', `${correlationKey}.json`], options),
     executor_decisions: decisions.map((decision) => ({
       recommendation_id: decision.recommendation_id,
       disposition: decision.disposition,
@@ -402,7 +404,7 @@ function recordExecutorDecision(input = {}, options = {}) {
     return { ok: false, errors: validation.errors };
   }
 
-  const artifactPath = path.join(root, '.advisor', 'decisions', 'executor', `${correlationKey}.json`);
+  const artifactPath = runtimePath(root, ['decisions', 'executor', `${correlationKey}.json`], options);
   writeJson(artifactPath, artifact);
   appendExecutorDecisionAudit(artifact, artifactPath, { ...options, root });
   return { ok: true, path: artifactPath, artifact };
@@ -483,7 +485,8 @@ function validateVerificationEvidence(artifact) {
 }
 
 function appendVerificationEvidenceAudit(artifact, artifactPath, options = {}) {
-  const auditPath = options.auditPath || path.join(options.root || process.cwd(), '.advisor', 'audit', 'events.jsonl');
+  const root = options.root || process.cwd();
+  const auditPath = options.auditPath || runtimePath(root, ['audit', 'events.jsonl'], options);
   fs.mkdirSync(path.dirname(auditPath), { recursive: true });
   fs.appendFileSync(
     auditPath,
@@ -528,7 +531,7 @@ function recordVerificationEvidence(input = {}, options = {}) {
     return { ok: false, errors: validation.errors };
   }
 
-  const artifactPath = path.join(root, '.advisor', 'evidence', 'verification', `${correlationKey}.json`);
+  const artifactPath = runtimePath(root, ['evidence', 'verification', `${correlationKey}.json`], options);
   if (fs.existsSync(artifactPath)) {
     return { ok: false, errors: [`verification evidence already exists for correlationKey: ${correlationKey}`], path: artifactPath };
   }
@@ -551,8 +554,8 @@ function sameStringArray(left, right) {
   return left.every((value, index) => value === right[index]);
 }
 
-function finalReviewStatePath(root) {
-  return path.join(root, '.advisor', 'state', 'final-review.json');
+function finalReviewStatePath(root, options = {}) {
+  return runtimePath(root, ['state', 'final-review.json'], options);
 }
 
 function recordFinalReviewState(input = {}, options = {}) {

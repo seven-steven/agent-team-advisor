@@ -4,6 +4,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 
+const { runtimePath } = require('../runtime-paths.js');
 const finalReview = require('../final-review.js');
 const schemaPath = path.resolve(__dirname, '..', 'verification-evidence.schema.json');
 
@@ -87,7 +88,7 @@ test('recordVerificationEvidence writes one immutable verification snapshot and 
   assert.equal(result.ok, true);
   assert.equal(
     result.path,
-    path.join(root, '.advisor', 'evidence', 'verification', 'final-review-123.json'),
+    runtimePath(root, ['evidence', 'verification', 'final-review-123.json']),
   );
   const artifact = readJson(result.path);
   assert.equal(artifact.artifact_type, 'verification-evidence');
@@ -109,7 +110,7 @@ test('recordVerificationEvidence writes one immutable verification snapshot and 
   ]);
 
   const auditLines = fs
-    .readFileSync(path.join(root, '.advisor', 'audit', 'events.jsonl'), 'utf8')
+    .readFileSync(runtimePath(root, ['audit', 'events.jsonl']), 'utf8')
     .trim()
     .split('\n')
     .map((line) => JSON.parse(line));

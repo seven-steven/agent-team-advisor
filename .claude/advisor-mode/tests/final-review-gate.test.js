@@ -5,6 +5,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 
+const { runtimePath } = require('../runtime-paths.js');
 const advisorModeRoot = path.resolve(__dirname, '..');
 const projectRoot = path.resolve(advisorModeRoot, '..', '..');
 const finalReview = require('../final-review.js');
@@ -18,6 +19,11 @@ function makeTempRepo() {
 function writeJson(filePath, value) {
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
   fs.writeFileSync(filePath, `${JSON.stringify(value, null, 2)}\n`);
+}
+
+function writeAdvisorConfig(root, hooks = { advisor_mode: true, advisor_mode_strict: true }) {
+  fs.mkdirSync(path.join(root, '.planning'), { recursive: true });
+  fs.writeFileSync(path.join(root, '.planning', 'config.json'), `${JSON.stringify({ hooks }, null, 2)}\n`);
 }
 
 function makeEvent(overrides = {}) {
@@ -109,13 +115,13 @@ function allHookCommands(settings) {
 }
 
 function writeFinalReviewArtifacts(root, { verdict = makeVerdict(), evidence = makeEvidence(), executorDecision, state } = {}) {
-  writeJson(path.join(root, '.advisor', 'verdicts', 'final-review-03-05.json'), verdict);
-  writeJson(path.join(root, '.advisor', 'evidence', 'verification', 'final-review-03-05.json'), evidence);
+  writeJson(runtimePath(root, ['verdicts', 'final-review-03-05.json']), verdict);
+  writeJson(runtimePath(root, ['evidence', 'verification', 'final-review-03-05.json']), evidence);
   if (executorDecision) {
-    writeJson(path.join(root, '.advisor', 'decisions', 'executor', 'final-review-03-05.json'), executorDecision);
+    writeJson(runtimePath(root, ['decisions', 'executor', 'final-review-03-05.json']), executorDecision);
   }
   if (state) {
-    writeJson(path.join(root, '.advisor', 'state', 'final-review.json'), state);
+    writeJson(runtimePath(root, ['state', 'final-review.json']), state);
   }
 }
 
@@ -174,9 +180,29 @@ test('Stop hook CLI fails closed when stdin does not end before timeout', async 
   assertBlockingHookOutput({ status, stdout, stderr });
 });
 
+test('final review gate stays inert when advisor mode is disabled', () => {
+  const root = makeTempRepo();
+  const result = evaluateFinalReviewGate(makeEvent(), { root });
+
+  assert.equal(result.gateAction, 'none');
+  assert.equal(result.reasonCode, 'advisor-mode-disabled');
+});
+
+test('soft mode downgrades missing final review to advisory', () => {
+  const root = makeTempRepo();
+  writeAdvisorConfig(root, { advisor_mode: true, advisor_mode_strict: false });
+  const result = evaluateFinalReviewGate(makeEvent(), { root });
+
+  assert.equal(result.gateAction, 'advisory');
+  assert.equal(result.advisoryOnly, true);
+  assert.equal(result.reasonCode, 'missing-fresh-final-review');
+  assert.match(result.hookOutput.hookSpecificOutput.additionalContext, /recommended/i);
+});
+
 test('explicit non-trivial completion blocks when no fresh final review exists', () => {
   assert.equal(typeof evaluateFinalReviewGate, 'function');
   const root = makeTempRepo();
+  writeAdvisorConfig(root);
   writeJson(path.join(root, '.advisor', 'consultations', 'recommendations', 'final-review-03-05.json'), {
     correlationKey: 'final-review-03-05',
     status: 'PASS',
@@ -192,6 +218,7 @@ test('explicit non-trivial completion blocks when no fresh final review exists',
 
 test('stale final review blocks on evidence ref and changed-file fingerprint mismatch', () => {
   const root = makeTempRepo();
+  writeAdvisorConfig(root);
   writeFinalReviewArtifacts(root, {
     state: {
       correlationKey: 'final-review-03-05',
@@ -216,6 +243,7 @@ test('PASS verdict with matching verification evidence and changed-file fingerpr
   assert.equal(typeof finalReview.recordFinalReviewState, 'function');
   assert.equal(typeof finalReview.isFinalReviewFresh, 'function');
   const root = makeTempRepo();
+  writeAdvisorConfig(root);
   writeFinalReviewArtifacts(root);
   const recorded = finalReview.recordFinalReviewState(
     {
@@ -238,6 +266,7 @@ test('PASS verdict with matching verification evidence and changed-file fingerpr
 
 test('non-PASS final verdict blocks until matching executor-decision artifact exists', () => {
   const root = makeTempRepo();
+  writeAdvisorConfig(root);
   writeFinalReviewArtifacts(root, {
     verdict: makeVerdict({ status: 'CONCERNS', risk: 'medium' }),
     state: {
@@ -259,7 +288,7 @@ test('non-PASS final verdict blocks until matching executor-decision artifact ex
   assert.equal(missingDecision.gateAction, 'block');
   assert.equal(missingDecision.reasonCode, 'missing-executor-decision');
 
-  writeJson(path.join(root, '.advisor', 'decisions', 'executor', 'final-review-03-05.json'), makeExecutorDecision());
+  writeJson(runtimePath(root, ['decisions', 'executor', 'final-review-03-05.json']), makeExecutorDecision());
   const satisfied = evaluateFinalReviewGate(
     makeEvent({ executor_decision_ref: '.advisor/decisions/executor/final-review-03-05.json' }),
     { root },

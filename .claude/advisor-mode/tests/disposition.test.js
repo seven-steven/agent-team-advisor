@@ -7,6 +7,7 @@ const path = require('node:path');
 const advisorModeRoot = path.resolve(__dirname, '..');
 const finalReviewPath = path.join(advisorModeRoot, 'final-review.js');
 const dispositionSchemaPath = path.join(advisorModeRoot, 'disposition.schema.json');
+const { runtimePath } = require('../runtime-paths.js');
 const {
   recordExecutorDecision,
   validateExecutorDecision,
@@ -89,7 +90,7 @@ test('disposition schema is a strict executor-decision artifact contract', () =>
 test('recordExecutorDecision writes separate executor artifact without mutating verdict file', () => {
   const root = makeTempRepo();
   const verdict = makeVerdict();
-  const verdictPath = path.join(root, '.advisor', 'verdicts', `${verdict.correlationKey}.json`);
+  const verdictPath = runtimePath(root, ['verdicts', `${verdict.correlationKey}.json`]);
   fs.mkdirSync(path.dirname(verdictPath), { recursive: true });
   fs.writeFileSync(verdictPath, `${JSON.stringify(verdict, null, 2)}\n`);
   const originalVerdictBytes = fs.readFileSync(verdictPath, 'utf8');
@@ -99,7 +100,7 @@ test('recordExecutorDecision writes separate executor artifact without mutating 
     {
       correlationKey: verdict.correlationKey,
       verdict,
-      verdict_ref: `.advisor/verdicts/${verdict.correlationKey}.json`,
+      verdict_ref: runtimePath(root, ['verdicts', `${verdict.correlationKey}.json`]),
       decisions: makeDecisions(),
     },
     { root },
@@ -108,19 +109,13 @@ test('recordExecutorDecision writes separate executor artifact without mutating 
   assert.equal(result.ok, true);
   assert.equal(fs.readFileSync(verdictPath, 'utf8'), originalVerdictBytes);
   assert.equal(JSON.stringify(verdict), originalVerdictObject);
-  assert.equal(
-    fs.existsSync(path.join(root, '.advisor', 'decisions', 'executor', `${verdict.correlationKey}.json`)),
-    true,
-  );
-  assert.equal(
-    fs.existsSync(path.join(root, '.advisor', 'decisions', 'dispositions', `${verdict.correlationKey}.json`)),
-    false,
-  );
+  assert.equal(fs.existsSync(runtimePath(root, ['decisions', 'executor', `${verdict.correlationKey}.json`])), true);
+  assert.equal(fs.existsSync(runtimePath(root, ['decisions', 'dispositions', `${verdict.correlationKey}.json`])), false);
 
   const artifact = readJson(result.path);
   assert.equal(artifact.artifact_type, 'executor-decision');
   assert.equal(artifact.correlationKey, verdict.correlationKey);
-  assert.equal(artifact.verdict_ref, `.advisor/verdicts/${verdict.correlationKey}.json`);
+  assert.equal(artifact.verdict_ref, runtimePath(root, ['verdicts', `${verdict.correlationKey}.json`]));
   assert.deepEqual(
     artifact.executor_decisions.map((decision) => decision.disposition),
     ['accepted', 'rejected', 'deferred'],
@@ -133,7 +128,7 @@ test('validateExecutorDecision requires one valid decision per normalized recomm
   const validArtifact = {
     artifact_type: 'executor-decision',
     correlationKey: verdict.correlationKey,
-    verdict_ref: `.advisor/verdicts/${verdict.correlationKey}.json`,
+    verdict_ref: '.advisor/verdicts/final-review-03-03.json',
     executor_decisions: makeDecisions().map((decision) => ({
       ...decision,
       decided_at: '2026-05-27T07:01:00.000Z',
@@ -167,7 +162,7 @@ test('validateExecutorDecision rejects duplicate recommendation decisions', () =
   const artifact = {
     artifact_type: 'executor-decision',
     correlationKey: verdict.correlationKey,
-    verdict_ref: `.advisor/verdicts/${verdict.correlationKey}.json`,
+    verdict_ref: '.advisor/verdicts/final-review-03-03.json',
     executor_decisions: [
       ...makeDecisions().map((decision) => ({
         ...decision,
@@ -198,7 +193,7 @@ test('recordExecutorDecision appends concise audit event after validation', () =
     {
       correlationKey: verdict.correlationKey,
       verdict,
-      verdict_ref: `.advisor/verdicts/${verdict.correlationKey}.json`,
+      verdict_ref: runtimePath(root, ['verdicts', `${verdict.correlationKey}.json`]),
       decisions: makeDecisions(),
     },
     { root },
@@ -206,7 +201,7 @@ test('recordExecutorDecision appends concise audit event after validation', () =
 
   assert.equal(result.ok, true);
   const events = fs
-    .readFileSync(path.join(root, '.advisor', 'audit', 'events.jsonl'), 'utf8')
+    .readFileSync(runtimePath(root, ['audit', 'events.jsonl']), 'utf8')
     .trim()
     .split('\n')
     .map((line) => JSON.parse(line));

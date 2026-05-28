@@ -6,7 +6,7 @@ const path = require('node:path');
 
 const claudeRoot = path.resolve(__dirname, '..', '..');
 const runtimeProbePath = path.join(claudeRoot, 'hooks', 'advisor-runtime-probe.js');
-const { buildPermissionDecisionOutput, evaluateDispositionState } = require(runtimeProbePath);
+const { buildPermissionDecisionOutput, evaluateDispositionState, resolveDispositionPath } = require(runtimeProbePath);
 
 const allowedDispositions = ['approve', 'reject', 'revise', 'defer'];
 
@@ -44,6 +44,14 @@ function writeDisposition(dispositionsDir, correlationKey, disposition, override
   fs.writeFileSync(path.join(dispositionsDir, `${correlationKey}.json`), `${JSON.stringify(artifact, null, 2)}\n`);
   return artifact;
 }
+
+test('runtime probe resolves disposition path outside repo workspace', () => {
+  const paths = makeDispositionRoot();
+  const resolved = resolveDispositionPath(blockedEvent(), paths);
+
+  assert.equal(resolved.dispositionPath.startsWith(path.join(paths.root, '.advisor')), true);
+  assert.match(resolved.dispositionPath, /decisions[\\/]dispositions/);
+});
 
 test('buildPermissionDecisionOutput emits supported PreToolUse host decision fields only', () => {
   const output = buildPermissionDecisionOutput('deny', {

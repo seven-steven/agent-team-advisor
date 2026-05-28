@@ -2,13 +2,17 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
+const { runtimePath } = require('../advisor-mode/runtime-paths.js');
 const { normalizeFailureSignature } = require('./advisor-failure-tracker.js');
 
 const GATED_MATCHER_TOOLS = new Set(['Bash', 'Edit', 'Write', 'MultiEdit']);
 const READ_ONLY_SOURCE = 'read-only-advisor';
 const ADVISOR_AGENT = 'advisor-reviewer';
 const RISK_ORDER = ['low', 'medium', 'high', 'critical'];
-const DEFAULT_FAILURE_STATE_FILE = path.join('.advisor', 'state', 'failure-signatures.json');
+const DEFAULT_FAILURE_STATE_FILE = ['state', 'failure-signatures.json'];
+const CONSULTATION_REQUEST_PATH = ['consultations', 'requests'];
+const CONSULTATION_RECOMMENDATION_PATH = ['consultations', 'recommendations'];
+const DISPOSITION_PATH = ['decisions', 'dispositions'];
 
 function stableStringify(value) {
   if (value === null || typeof value !== 'object') return JSON.stringify(value);
@@ -45,6 +49,24 @@ function buildGateEvent(raw) {
   return event || { failOpen: true, reasonCode: 'malformed-host-payload' };
 }
 
+function readAdvisorHookConfig(rootDir) {
+  try {
+    const configPath = path.join(rootDir, '.planning', 'config.json');
+    const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+    return config.hooks || {};
+  } catch {
+    return {};
+  }
+}
+
+function isAdvisorModeEnabled(rootDir) {
+  return readAdvisorHookConfig(rootDir).advisor_mode === true;
+}
+
+function isAdvisorModeStrict(rootDir) {
+  return readAdvisorHookConfig(rootDir).advisor_mode_strict === true;
+}
+
 function getRoot(options = {}) {
   return options.root || process.env.CLAUDE_PROJECT_DIR || process.cwd();
 }
@@ -60,7 +82,7 @@ function readJson(filePath, fallback) {
 function readPersistedFailureCount(rawEvent = {}, event = buildGateEvent(rawEvent), options = {}) {
   if (!event || event.failOpen) return { count: 0 };
   const root = getRoot(options);
-  const statePath = options.failureStatePath || path.join(root, DEFAULT_FAILURE_STATE_FILE);
+  const statePath = options.failureStatePath || runtimePath(root, DEFAULT_FAILURE_STATE_FILE, options);
   const signature = normalizeFailureSignature({
     ...rawEvent,
     toolName: event.toolName,
@@ -189,8 +211,8 @@ function getConsultationPaths(event, options = {}) {
   const correlationKey = event.correlationKey || buildCorrelationKey(event);
   return {
     correlationKey,
-    requestPath: path.join(root, '.advisor', 'consultations', 'requests', `${correlationKey}.json`),
-    recommendationPath: path.join(root, '.advisor', 'consultations', 'recommendations', `${correlationKey}.json`),
+    requestPath: runtimePath(root, [...CONSULTATION_REQUEST_PATH, `${correlationKey}.json`], options),
+    recommendationPath: runtimePath(root, [...CONSULTATION_RECOMMENDATION_PATH, `${correlationKey}.json`], options),
   };
 }
 
@@ -258,15 +280,15 @@ const CRITICAL_DECISION_CLASSES = new Set([
 const HUMAN_DISPOSITIONS = ['approve', 'reject', 'revise', 'defer'];
 
 function getDispositionPath(correlationKey, options = {}) {
-  return options.dispositionPath || path.join(getRoot(options), '.advisor', 'decisions', 'dispositions', `${correlationKey}.json`);
+  return options.dispositionPath || runtimePath(getRoot(options), [...DISPOSITION_PATH, `${correlationKey}.json`], options);
 }
 
 function getHumanRecommendationPath(correlationKey, options = {}) {
-  return options.recommendationPath || path.join(getRoot(options), '.advisor', 'consultations', 'recommendations', `${correlationKey}.json`);
+  return options.recommendationPath || runtimePath(getRoot(options), [...CONSULTATION_RECOMMENDATION_PATH, `${correlationKey}.json`], options);
 }
 
 function getHumanRequestPath(correlationKey, options = {}) {
-  return options.requestPath || path.join(getRoot(options), '.advisor', 'consultations', 'requests', `${correlationKey}.json`);
+  return options.requestPath || runtimePath(getRoot(options), [...CONSULTATION_REQUEST_PATH, `${correlationKey}.json`], options);
 }
 
 function isString(value) {
@@ -301,6 +323,20 @@ function validateAdvisorRecommendation(recommendation, request) {
   return ['blockingFindings', 'recommendedActions', 'verificationGuidance'].every((key) =>
     Array.isArray(recommendation[key]) && recommendation[key].every(isString),
   );
+}
+
+function advisoryOnlyResult(base, reason, additionalContext) {
+  return {
+    ...base,
+    gateAction: 'advisory',
+    advisoryOnly: true,
+    hookOutput: {
+      hookSpecificOutput: {
+        hookEventName: 'PreToolUse',
+        additionalContext: additionalContext || reason,
+      },
+    },
+  };
 }
 
 function buildDecision(permissionDecision, reason, additionalContext) {
@@ -462,6 +498,9 @@ function hardStop(reasonCode, message) {
 }
 
 function evaluateGatePolicy(rawEvent, options = {}) {
+  const root = getRoot(options);
+  if (!isAdvisorModeEnabled(root)) return { gateAction: 'none', reasonCode: 'advisor-mode-disabled' };
+  const strictMode = isAdvisorModeStrict(root);
   const event = buildGateEvent(rawEvent);
   if (event.failOpen) return { gateAction: 'none', failOpen: true, reasonCode: event.reasonCode };
   if (!GATED_MATCHER_TOOLS.has(event.toolName)) return { gateAction: 'none' };
@@ -509,23 +548,44 @@ function evaluateGatePolicy(rawEvent, options = {}) {
     );
     if (decisionPacket.gateAction === 'hard-stop') return decisionPacket;
     if (decisionPacket.workflowGateStatus === 'blocked-pending-advisor') {
-      return {
-        ...decisionPacket,
-        gateAction: 'block',
-        policyRuleId: rule.id,
-        actionClass: classes.actionClass,
-        hookOutput: buildDecision(
-          'deny',
-          'Advisor consultation is required before this critical workflow path proceeds. Retry only after the recommendation artifact exists and validates.',
-          `Advisor request: ${paths.requestPath}\nAdvisor recommendation: ${paths.recommendationPath}\n${decisionPacket.advisorProducer.instruction}`,
-        ),
-      };
+      return strictMode
+        ? {
+            ...decisionPacket,
+            gateAction: 'block',
+            policyRuleId: rule.id,
+            actionClass: classes.actionClass,
+            hookOutput: buildDecision(
+              'deny',
+              'Advisor consultation is required before this critical workflow path proceeds. Retry only after the recommendation artifact exists and validates.',
+              `Advisor request: ${paths.requestPath}\nAdvisor recommendation: ${paths.recommendationPath}\n${decisionPacket.advisorProducer.instruction}`,
+            ),
+          }
+        : advisoryOnlyResult(
+            {
+              ...decisionPacket,
+              workflowGateStatus: 'advisory-pending-advisor',
+              policyRuleId: rule.id,
+              actionClass: classes.actionClass,
+            },
+            'Advisor consultation is recommended before this critical workflow path proceeds.',
+            `Advisor request: ${paths.requestPath}\nAdvisor recommendation: ${paths.recommendationPath}`,
+          );
     }
     const reentry = evaluateHumanGateReentry(decisionPacket, options);
     if (reentry.workflowGateStatus === 'satisfied') {
       return { ...decisionPacket, ...reentry, gateAction: 'allow', policyRuleId: rule.id };
     }
-    return { ...decisionPacket, ...reentry, gateAction: 'block', policyRuleId: rule.id };
+    return strictMode
+      ? { ...decisionPacket, ...reentry, gateAction: 'block', policyRuleId: rule.id }
+      : advisoryOnlyResult(
+          {
+            ...decisionPacket,
+            ...reentry,
+            workflowGateStatus: 'advisory-pending-human',
+            policyRuleId: rule.id,
+          },
+          'Human approval disposition is recommended before retrying this workflow path.',
+        );
   }
 
   const readResult = readAdvisorRecommendation(paths.recommendationPath);
@@ -558,26 +618,45 @@ function evaluateGatePolicy(rawEvent, options = {}) {
     return hardStop('request-write-failed', 'Advisor Mode consultation request could not be written; blocking configured gate event.');
   }
 
-  return {
-    gateAction: 'block',
-    workflowGateStatus: 'blocked-pending-advisor',
-    retryRequired: true,
-    reentryAllowed: false,
-    reasonCode: readResult.reasonCode || 'invalid-recommendation-artifact',
-    correlationKey: paths.correlationKey,
-    requestPath: paths.requestPath,
-    recommendationPath: paths.recommendationPath,
-    policyRuleId: rule.id,
-    auditLabel: rule.auditLabel,
-    actionClass: classes.actionClass,
-    failureSignature: persistedFailure.signature,
-    failureCount: event.failureCount,
-    hookOutput: buildDecision(
-      'deny',
-      'Advisor consultation is required before this high-risk workflow path proceeds. Retry only after the recommendation artifact exists and validates.',
-      `Advisor request: ${paths.requestPath}\nAdvisor recommendation: ${paths.recommendationPath}\n${request.advisorProducer.instruction}`,
-    ),
-  };
+  return strictMode
+    ? {
+        gateAction: 'block',
+        workflowGateStatus: 'blocked-pending-advisor',
+        retryRequired: true,
+        reentryAllowed: false,
+        reasonCode: readResult.reasonCode || 'invalid-recommendation-artifact',
+        correlationKey: paths.correlationKey,
+        requestPath: paths.requestPath,
+        recommendationPath: paths.recommendationPath,
+        policyRuleId: rule.id,
+        auditLabel: rule.auditLabel,
+        actionClass: classes.actionClass,
+        failureSignature: persistedFailure.signature,
+        failureCount: event.failureCount,
+        hookOutput: buildDecision(
+          'deny',
+          'Advisor consultation is required before this high-risk workflow path proceeds. Retry only after the recommendation artifact exists and validates.',
+          `Advisor request: ${paths.requestPath}\nAdvisor recommendation: ${paths.recommendationPath}\n${request.advisorProducer.instruction}`,
+        ),
+      }
+    : advisoryOnlyResult(
+        {
+          workflowGateStatus: 'advisory-pending-advisor',
+          retryRequired: true,
+          reentryAllowed: false,
+          reasonCode: readResult.reasonCode || 'invalid-recommendation-artifact',
+          correlationKey: paths.correlationKey,
+          requestPath: paths.requestPath,
+          recommendationPath: paths.recommendationPath,
+          policyRuleId: rule.id,
+          auditLabel: rule.auditLabel,
+          actionClass: classes.actionClass,
+          failureSignature: persistedFailure.signature,
+          failureCount: event.failureCount,
+        },
+        'Advisor consultation is recommended before this high-risk workflow path proceeds.',
+        `Advisor request: ${paths.requestPath}\nAdvisor recommendation: ${paths.recommendationPath}`,
+      );
 }
 
 function parseInput(input) {

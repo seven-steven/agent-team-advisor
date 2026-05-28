@@ -7,11 +7,16 @@ const path = require('node:path');
 const gate = require('../../hooks/advisor-gate.js');
 const settingsPath = path.resolve(__dirname, '..', '..', 'settings.json');
 
-function makeTempRoot() {
+function makeTempRoot(hooks = { advisor_mode: true, advisor_mode_strict: true }) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'advisor-consultation-'));
   fs.mkdirSync(path.join(root, '.advisor', 'consultations', 'requests'), { recursive: true });
   fs.mkdirSync(path.join(root, '.advisor', 'consultations', 'recommendations'), { recursive: true });
   fs.mkdirSync(path.join(root, '.claude', 'advisor-mode'), { recursive: true });
+  fs.mkdirSync(path.join(root, '.planning'), { recursive: true });
+  fs.writeFileSync(
+    path.join(root, '.planning', 'config.json'),
+    JSON.stringify({ hooks }, null, 2) + '\n',
+  );
   fs.copyFileSync(
     path.resolve(__dirname, '..', 'policy.example.json'),
     path.join(root, '.claude', 'advisor-mode', 'policy.example.json'),
@@ -76,6 +81,31 @@ function allHookCommands(settings, eventName) {
   );
 }
 
+test('advisor gate stays inert when advisor mode is disabled', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'advisor-consultation-disabled-'));
+  fs.mkdirSync(path.join(root, '.claude', 'advisor-mode'), { recursive: true });
+  fs.copyFileSync(
+    path.resolve(__dirname, '..', 'policy.example.json'),
+    path.join(root, '.claude', 'advisor-mode', 'policy.example.json'),
+  );
+
+  const result = gate.evaluateGatePolicy(highRiskBashEvent(), { root });
+
+  assert.equal(result.gateAction, 'none');
+  assert.equal(result.reasonCode, 'advisor-mode-disabled');
+});
+
+test('soft mode returns advisory instead of deny/block for high-risk hooks', () => {
+  const root = makeTempRoot({ advisor_mode: true, advisor_mode_strict: false });
+  const result = gate.evaluateGatePolicy(highRiskBashEvent(), { root });
+
+  assert.equal(result.gateAction, 'advisory');
+  assert.equal(result.advisoryOnly, true);
+  assert.equal(result.workflowGateStatus, 'advisory-pending-advisor');
+  assert.equal(result.hookOutput.hookSpecificOutput.permissionDecision, undefined);
+  assert.match(result.hookOutput.hookSpecificOutput.additionalContext, /Advisor request:/i);
+});
+
 test('high-risk configured tools block first attempt and create deterministic consultation paths', () => {
   for (const toolName of ['Bash', 'Edit', 'Write', 'MultiEdit']) {
     const root = makeTempRoot();
@@ -89,10 +119,10 @@ test('high-risk configured tools block first attempt and create deterministic co
     assert.equal(result.hookOutput.hookSpecificOutput.permissionDecision, 'deny');
     assert.match(result.hookOutput.hookSpecificOutput.permissionDecisionReason, /advisor/i);
     assert.match(result.correlationKey, /^advisor-consultation-[a-f0-9]{24}$/);
-    assert.equal(result.requestPath, path.join(root, '.advisor', 'consultations', 'requests', `${result.correlationKey}.json`));
+    assert.equal(result.requestPath.includes('/consultations/requests/'), true);
     assert.equal(
-      result.recommendationPath,
-      path.join(root, '.advisor', 'consultations', 'recommendations', `${result.correlationKey}.json`),
+      result.recommendationPath.includes('/consultations/recommendations/'),
+      true,
     );
     assert.equal(fs.existsSync(result.requestPath), true);
 
@@ -130,6 +160,7 @@ test('missing malformed or mismatched recommendations keep explicit retry blocke
   assert.equal(missing.retryRequired, true);
   assert.equal(missing.reentryAllowed, false);
 
+  fs.mkdirSync(path.dirname(blocked.recommendationPath), { recursive: true });
   fs.writeFileSync(blocked.recommendationPath, '{bad json');
   const malformed = gate.evaluateGatePolicy(highRiskBashEvent(), { root });
   assert.equal(malformed.workflowGateStatus, 'blocked-pending-advisor');
@@ -247,9 +278,10 @@ test('classification failure for configured matcher event hard-stops with stable
 
 test('request artifact write failure hard-stops with stable request-write-failed reason', () => {
   const root = makeTempRoot();
-  const blocker = path.join(root, '.advisor', 'consultations', 'requests');
-  fs.rmSync(blocker, { recursive: true, force: true });
-  fs.writeFileSync(blocker, 'not a directory');
+  const blocker = gate.getConsultationPaths(highRiskBashEvent(), { root }).requestPath;
+  fs.rmSync(path.dirname(blocker), { recursive: true, force: true });
+  fs.mkdirSync(path.dirname(path.dirname(blocker)), { recursive: true });
+  fs.writeFileSync(path.dirname(blocker), 'not a directory');
 
   const result = gate.evaluateGatePolicy(highRiskBashEvent(), { root });
   assert.equal(result.gateAction, 'hard-stop');

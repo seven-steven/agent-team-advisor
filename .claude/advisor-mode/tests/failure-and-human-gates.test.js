@@ -5,6 +5,7 @@ const os = require('node:os');
 const path = require('node:path');
 const { execFileSync } = require('node:child_process');
 
+const { runtimePath } = require('../runtime-paths.js');
 const gate = require('../../hooks/advisor-gate.js');
 const failureTracker = require('../../hooks/advisor-failure-tracker.js');
 
@@ -15,13 +16,18 @@ const policy = JSON.parse(fs.readFileSync(path.join(repoRoot, '.claude', 'adviso
 const d10DecisionClasses = ['irreversible', 'security-boundary', 'shared-production', 'governance-configuration'];
 const d13Dispositions = ['approve', 'reject', 'revise', 'defer'];
 
-function makeTempRoot(prefix = 'advisor-human-gate-') {
+function makeTempRoot(prefix = 'advisor-human-gate-', hooks = { advisor_mode: true, advisor_mode_strict: true }) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
   fs.mkdirSync(path.join(root, '.advisor', 'state'), { recursive: true });
   fs.mkdirSync(path.join(root, '.advisor', 'audit'), { recursive: true });
   fs.mkdirSync(path.join(root, '.advisor', 'consultations', 'requests'), { recursive: true });
   fs.mkdirSync(path.join(root, '.advisor', 'consultations', 'recommendations'), { recursive: true });
   fs.mkdirSync(path.join(root, '.advisor', 'decisions', 'dispositions'), { recursive: true });
+  fs.mkdirSync(path.join(root, '.planning'), { recursive: true });
+  fs.writeFileSync(
+    path.join(root, '.planning', 'config.json'),
+    JSON.stringify({ hooks }, null, 2) + '\n',
+  );
   return root;
 }
 
@@ -75,7 +81,7 @@ function validRecommendation(input, requestPath = '') {
 }
 
 function writeRecommendation(root, input, recommendation = validRecommendation(input)) {
-  const recommendationPath = path.join(root, '.advisor', 'consultations', 'recommendations', `${input.correlationKey}.json`);
+  const recommendationPath = runtimePath(root, ['consultations', 'recommendations', `${input.correlationKey}.json`]);
   fs.mkdirSync(path.dirname(recommendationPath), { recursive: true });
   fs.writeFileSync(recommendationPath, `${JSON.stringify(recommendation, null, 2)}\n`);
   return recommendationPath;
@@ -111,9 +117,9 @@ test('two identical normalized failures escalate at threshold 2 and require advi
   assert.equal(second.workflowGateStatus, 'blocked-pending-advisor');
   assert.equal(second.retryRequired, true);
 
-  const state = JSON.parse(fs.readFileSync(path.join(root, '.advisor', 'state', 'failure-signatures.json'), 'utf8'));
+  const state = JSON.parse(fs.readFileSync(runtimePath(root, ['state', 'failure-signatures.json']), 'utf8'));
   assert.equal(state.signatures[second.signature].count, 2);
-  assert.equal(fs.existsSync(path.join(root, '.advisor', 'audit', 'events.jsonl')), true);
+  assert.equal(fs.existsSync(runtimePath(root, ['audit', 'events.jsonl'])), true);
   assert.equal(fs.existsSync(path.join(root, '.planning', 'failure-signatures.json')), false);
 });
 
@@ -157,7 +163,7 @@ test('evaluateGatePolicy reads persisted repeated failure state using tracker si
   const trackerSignature = failureTracker.normalizeFailureSignature(payload);
 
   assert.equal(tracked.signature, trackerSignature);
-  const state = JSON.parse(fs.readFileSync(path.join(root, '.advisor', 'state', 'failure-signatures.json'), 'utf8'));
+  const state = JSON.parse(fs.readFileSync(runtimePath(root, ['state', 'failure-signatures.json']), 'utf8'));
   assert.equal(state.signatures[trackerSignature].count, 2);
 
   const result = gate.evaluateGatePolicy(
@@ -201,6 +207,23 @@ test('critical D-10 classes emit human approval only after matching advisor reco
     assert.equal(packet.decisionClass, decisionClass);
     assert.equal(packet.advisorRecommendation.correlationKey, input.correlationKey);
   }
+});
+
+test('soft mode returns advisory instead of block for critical human approval paths', () => {
+  const root = makeTempRoot('advisor-soft-human-', { advisor_mode: true, advisor_mode_strict: false });
+  const event = { toolName: 'Bash', toolInput: { command: 'git push --force origin main' }, taskState: 'implementation' };
+  const first = gate.evaluateGatePolicy(event, { root, policy });
+  writeRecommendation(
+    root,
+    { correlationKey: first.correlationKey, riskLevel: first.risk },
+    validRecommendation({ correlationKey: first.correlationKey, riskLevel: first.risk }, first.requestPath),
+  );
+  const packet = gate.evaluateGatePolicy(event, { root, policy });
+
+  assert.equal(packet.gateAction, 'advisory');
+  assert.equal(packet.advisoryOnly, true);
+  assert.equal(packet.workflowGateStatus, 'advisory-pending-human');
+  assert.equal(packet.hookOutput.hookSpecificOutput.permissionDecision, undefined);
 });
 
 test('evaluateGatePolicy routes destructive force-push credential and production actions to human approval retry', () => {
@@ -364,7 +387,8 @@ test('writeDisposition persists approve reject revise defer under disposition ru
 
     assert.equal(artifact.event, 'human_approval.disposition');
     assert.equal(artifact.disposition, disposition);
-    assert.match(artifact.path, new RegExp(`\\.advisor/decisions/dispositions/${correlationKey}\\.json$`));
+    assert.equal(artifact.path.startsWith(path.join(root, '.advisor')), false);
+    assert.match(artifact.path, new RegExp(`advisor-mode.*decisions[\\/]dispositions[\\/]${correlationKey}\\.json$`));
     const stored = JSON.parse(fs.readFileSync(artifact.path, 'utf8'));
     assert.equal(stored.disposition, disposition);
   }
@@ -379,6 +403,7 @@ test('human re-entry blocks absent malformed mismatched stale dispositions and s
 
   assert.equal(gate.evaluateHumanGateReentry(packet, { root }).workflowGateStatus, 'blocked-pending-human');
 
+  fs.mkdirSync(path.dirname(packet.dispositionPath), { recursive: true });
   fs.writeFileSync(packet.dispositionPath, '{bad json');
   assert.equal(gate.evaluateHumanGateReentry(packet, { root }).workflowGateStatus, 'blocked-pending-human');
 
@@ -473,4 +498,7 @@ test('runtime audit state and disposition artifacts are ignored outside planning
     assert.equal(isIgnored(artifact), true, `${artifact} should be ignored`);
     assert.equal(artifact.startsWith('.planning/'), false);
   }
+
+  const isolatedPath = runtimePath(repoRoot, ['audit', 'events.jsonl']);
+  assert.equal(isolatedPath.startsWith(path.join(repoRoot, '.advisor')), false);
 });

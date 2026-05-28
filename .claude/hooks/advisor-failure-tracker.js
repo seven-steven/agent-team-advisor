@@ -2,10 +2,21 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
+const { runtimePath } = require('../advisor-mode/runtime-paths.js');
 
 const FAILURE_THRESHOLD = 2;
-const DEFAULT_STATE_FILE = path.join('.advisor', 'state', 'failure-signatures.json');
-const DEFAULT_AUDIT_FILE = path.join('.advisor', 'audit', 'events.jsonl');
+const DEFAULT_STATE_FILE = ['state', 'failure-signatures.json'];
+const DEFAULT_AUDIT_FILE = ['audit', 'events.jsonl'];
+
+function isAdvisorModeEnabled(rootDir) {
+  try {
+    const configPath = path.join(rootDir, '.planning', 'config.json');
+    const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+    return config.hooks?.advisor_mode === true;
+  } catch {
+    return false;
+  }
+}
 
 function getRoot(options = {}) {
   return options.root || process.env.CLAUDE_PROJECT_DIR || process.cwd();
@@ -79,7 +90,7 @@ function writeJson(filePath, value) {
 
 function updateFailureState(payload = {}, options = {}) {
   const root = getRoot(options);
-  const statePath = options.statePath || path.join(root, DEFAULT_STATE_FILE);
+  const statePath = options.statePath || runtimePath(root, DEFAULT_STATE_FILE, options);
   const signature = options.signature || normalizeFailureSignature(payload);
   const state = readJson(statePath, { version: 1, signatures: {} });
   if (!state.signatures || typeof state.signatures !== 'object') state.signatures = {};
@@ -118,15 +129,15 @@ function buildFailureEvent(payload = {}, stateUpdate = {}, options = {}) {
     requiresAdvisorDisposition: requiresAdvisorConsultation,
     workflowGateStatus: requiresAdvisorConsultation ? 'blocked-pending-advisor' : 'observed',
     retryRequired: requiresAdvisorConsultation,
-    statePath: stateUpdate.statePath || path.join(root, DEFAULT_STATE_FILE),
-    auditPath: options.auditPath || path.join(root, DEFAULT_AUDIT_FILE),
+    statePath: stateUpdate.statePath || runtimePath(root, DEFAULT_STATE_FILE, options),
+    auditPath: options.auditPath || runtimePath(root, DEFAULT_AUDIT_FILE, options),
   };
   return event;
 }
 
 function appendAuditEvent(event, options = {}) {
   const root = getRoot(options);
-  const auditPath = options.auditPath || event.auditPath || path.join(root, DEFAULT_AUDIT_FILE);
+  const auditPath = options.auditPath || event.auditPath || runtimePath(root, DEFAULT_AUDIT_FILE, options);
   fs.mkdirSync(path.dirname(auditPath), { recursive: true });
   const concise = {
     timestamp: new Date().toISOString(),
@@ -146,7 +157,9 @@ function appendAuditEvent(event, options = {}) {
 function isFailure(payload = {}) {
   const exitCode = getExitCode(payload);
   const status = String(pick(payload.status, getToolResponse(payload).status, '')).toLowerCase();
-  return Number(exitCode) !== 0 || ['failed', 'failure', 'error'].includes(status) || Boolean(getOutputText(payload));
+  const normalizedExitCode = Number.parseInt(String(exitCode), 10);
+  const hasNumericFailureExit = Number.isFinite(normalizedExitCode) && normalizedExitCode !== 0;
+  return hasNumericFailureExit || ['failed', 'failure', 'error'].includes(status);
 }
 
 function trackFailure(payload = {}, options = {}) {
@@ -181,7 +194,11 @@ function main() {
     clearTimeout(stdinTimeout);
     try {
       const event = parseInput(input);
-      const result = trackFailure(event);
+      const rootDir = pick(event?.cwd, process.env.CLAUDE_PROJECT_DIR, process.cwd());
+      if (!isAdvisorModeEnabled(rootDir)) {
+        process.exit(0);
+      }
+      const result = trackFailure(event, { root: rootDir });
       if (result.requiresAdvisorConsultation) {
         process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: 'PostToolUse', additionalContext: JSON.stringify(result) } }));
       }
@@ -194,7 +211,9 @@ function main() {
 if (require.main === module) main();
 
 module.exports = {
+  getExitCode,
   normalizeFailureSignature,
+  isFailure,
   updateFailureState,
   buildFailureEvent,
   trackFailure,

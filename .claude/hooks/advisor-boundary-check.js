@@ -40,6 +40,19 @@ function hasRequiredToolSet(tools) {
   return tools.length === REQUIRED_TOOLS.length && REQUIRED_TOOLS.every((tool) => tools.includes(tool));
 }
 
+function isAdvisorModeEnabled(rootDir, options = {}) {
+  if (typeof options.advisorModeEnabled === 'boolean') {
+    return options.advisorModeEnabled;
+  }
+  try {
+    const configPath = path.join(rootDir, '.planning', 'config.json');
+    const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+    return config.hooks?.advisor_mode === true;
+  } catch {
+    return false;
+  }
+}
+
 function validateAdvisorBoundary(rootDir) {
   const findings = [];
   let frontmatter = {};
@@ -108,6 +121,11 @@ function main() {
         process.exit(0);
       }
 
+      const rootDir = data.cwd || process.env.CLAUDE_PROJECT_DIR || process.cwd();
+      if (!isAdvisorModeEnabled(rootDir)) {
+        process.exit(0);
+      }
+
       writeHookContext();
     } catch {
       process.exit(0);
@@ -120,6 +138,7 @@ if (require.main === module) {
 }
 
 module.exports = {
+  isAdvisorModeEnabled,
   validateAdvisorBoundary,
   main,
 };

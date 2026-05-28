@@ -2,6 +2,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
+const { runtimePath } = require('../advisor-mode/runtime-paths.js');
 
 const ALLOWED_PERMISSION_DECISIONS = new Set(['allow', 'deny', 'ask']);
 const ALLOWED_DISPOSITIONS = new Set(['approve', 'reject', 'revise', 'defer']);
@@ -54,7 +55,7 @@ function buildPermissionDecisionOutput(decision, context = {}) {
 function resolveDispositionPath(event, paths = {}) {
   const root = paths.root || process.cwd();
   const dispositionsDir =
-    paths.dispositionsDir || path.join(root, '.advisor', 'decisions', 'dispositions');
+    paths.dispositionsDir || runtimePath(root, ['decisions', 'dispositions'], paths);
   const correlationKey = deriveCorrelationKey(event);
 
   return {
@@ -184,5 +185,6 @@ if (require.main === module) {
 module.exports = {
   buildPermissionDecisionOutput,
   evaluateDispositionState,
+  resolveDispositionPath,
   main,
 };
