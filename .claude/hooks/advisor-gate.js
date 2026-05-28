@@ -122,7 +122,7 @@ function extractPath(toolInput = {}) {
   return String(toolInput.file_path || toolInput.path || toolInput.notebook_path || '');
 }
 
-function classifyToolClass(toolName, toolInput, policy) {
+function classifyToolClass(toolName, _toolInput, policy) {
   const toolClasses = requirePolicySection(policy, 'toolClasses');
   for (const [className, config] of Object.entries(toolClasses)) {
     if ((config.tools || []).includes(toolName)) return className;
@@ -150,7 +150,7 @@ function pathMatchesConfig(filePath, config = {}) {
   return matchesAny(filePath, config.patterns || []);
 }
 
-function classifyPathClass(toolName, toolInput = {}, policy) {
+function classifyPathClass(_toolName, toolInput = {}, policy) {
   const filePath = extractPath(toolInput);
   if (!filePath) return 'none';
   const protectedSurfaces = policy && policy.advisorMode && policy.advisorMode.gates && policy.advisorMode.gates.protectedSurfaces;
