@@ -2,6 +2,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { runtimePath } = require('./runtime-paths.js');
 const { appendAuditEvent } = require('./audit-log.js');
+const { recordAdvisorUsage } = require('./budget-state.js');
 
 const VERDICT_SCHEMA_PATH = path.join(__dirname, 'verdict.schema.json');
 const VALID_VERDICT_VALUES = {
@@ -588,6 +589,15 @@ function recordFinalReviewState(input = {}, options = {}) {
 
   const statePath = finalReviewStatePath(root);
   writeJson(statePath, state);
+  recordFinalReviewVerdictUsage({
+    correlationKey: input.correlationKey,
+    taskId: input.taskId,
+    sessionId: input.sessionId,
+    artifactPath: input.verdict_ref,
+    advisorTokens: input.advisorTokens,
+    advisorLatencyMs: input.advisorLatencyMs,
+    usageSource: input.advisorTokens === undefined && input.advisorLatencyMs === undefined ? 'unknown' : 'metadata',
+  }, { ...options, root });
   return { ok: true, path: statePath, state };
 }
 
@@ -618,6 +628,10 @@ function isFinalReviewFresh(input = {}, options = {}) {
   };
 }
 
+function recordFinalReviewVerdictUsage(input = {}, options = {}) {
+  return recordAdvisorUsage({ ...input, eventType: 'advisor_final_review' }, options);
+}
+
 module.exports = {
   buildContextPacket,
   validateContextPacket,
@@ -629,4 +643,5 @@ module.exports = {
   validateVerificationEvidence,
   recordFinalReviewState,
   isFinalReviewFresh,
+  recordFinalReviewVerdictUsage,
 };
