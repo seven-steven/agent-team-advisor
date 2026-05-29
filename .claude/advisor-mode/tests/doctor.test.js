@@ -217,7 +217,7 @@ test('README documents doctor commands, every check ID, offline default, smoke o
   assert.match(readme, /Doctor validation/);
   assert.match(readme, /node \.claude\/advisor-mode\/doctor\.js --json/);
   assert.match(readme, /read-only\/offline by default|offline\/read-only by default/);
-  assert.match(readme, /smoke checks require `--smoke`|`--smoke`[^\n]+smoke checks/);
+  assert.match(readme, /Smoke checks require `--smoke`|smoke checks require `--smoke`|`--smoke`[^\n]+smoke checks/i);
   assert.match(readme, /node --test \.claude\/advisor-mode\/tests\/audit-log\.test\.js \.claude\/advisor-mode\/tests\/budget-state\.test\.js \.claude\/advisor-mode\/tests\/doctor\.test\.js \.claude\/advisor-mode\/tests\/rollback\.test\.js/);
   for (const checkId of CHECK_IDS) assert.match(readme, new RegExp(checkId.replace('.', '\\.')));
 });

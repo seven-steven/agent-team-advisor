@@ -180,7 +180,7 @@ Use `--root <path>` to validate a different project root and `--runtime-root <pa
 node .claude/advisor-mode/doctor.js --root /path/to/project --runtime-root /tmp/advisor-runtime --json
 ```
 
-Use `--smoke` for explicit smoke-mode doctor runs. The default doctor does not make live provider calls; provider health comes from existing provider conformance state unless a future smoke check is explicitly wired.
+Use `--smoke` for explicit smoke-mode doctor runs. The doctor is offline/read-only by default and does not make live provider calls; provider health comes from existing provider conformance state unless a future smoke check is explicitly wired. Smoke checks require `--smoke`.
 
 Doctor is read-only for project assets. It does not mutate `.claude/settings.json`, `.claude/agents/advisor-reviewer.md`, `.claude/advisor-mode/policy.example.json`, or provider route files. It writes only runtime audit/state artifacts:
 
@@ -200,3 +200,11 @@ Doctor check IDs:
 | `audit.raw_stream`     | Append-only audit stream can be written and read through the shared audit helper.                                   |
 | `budget.policy`        | Advisor budget policy loads with task/session call, token, and latency caps.                                        |
 | `recovery.mode`        | Current operator mode resolves to enforce, warning-only, or disabled/kill-switch semantics.                         |
+
+## Phase 05 validation quick run
+
+Run the Phase 05 audit, budget, doctor, and rollback validation set with:
+
+```bash
+node --test .claude/advisor-mode/tests/audit-log.test.js .claude/advisor-mode/tests/budget-state.test.js .claude/advisor-mode/tests/doctor.test.js .claude/advisor-mode/tests/rollback.test.js
+```
