@@ -19,6 +19,8 @@ const FORBIDDEN_INPUT_FIELDS = new Set([
   'bearerToken',
   'credentialValue',
 ]);
+const STATIC_ROUTE_SOURCE_PREFIXES = ['configuredRoute', 'resolvedRoute', 'requestedAlias', 'routeConfig'];
+const OBSERVED_MODEL_SOURCE_SUFFIX = '.body.model';
 
 function getRoot(options = {}) {
   return options.root || process.env.CLAUDE_PROJECT_DIR || process.cwd();
@@ -35,6 +37,40 @@ function isPlainObject(value) {
 function hasLiteralSecret(value) {
   if (typeof value !== 'string') return false;
   return /(?:sk-[A-Za-z0-9]|bearer\s+[A-Za-z0-9._-]|_VALUE$)/i.test(value);
+}
+
+function normalizeAliasValue(value) {
+  return typeof value === 'string' && value.trim().length > 0 ? value.trim() : undefined;
+}
+
+function normalizeEndpointAlias(value) {
+  if (typeof value === 'string' && value.trim().length > 0) return value.trim();
+  return undefined;
+}
+
+function normalizeProviderResponse(input) {
+  if (!isPlainObject(input)) return null;
+  if (isPlainObject(input.body)) return input;
+  return { body: input, headers: input.headers };
+}
+
+function extractObservedModel(input) {
+  const providerResponse = normalizeProviderResponse(input);
+  const body = providerResponse && providerResponse.body;
+  if (!isPlainObject(body) || typeof body.model !== 'string' || body.model.trim().length === 0) {
+    return null;
+  }
+  const observedModel = body.model.trim();
+  const responseId = typeof body.id === 'string' && body.id.trim().length > 0
+    ? body.id.trim()
+    : typeof providerResponse.requestId === 'string' && providerResponse.requestId.trim().length > 0
+      ? providerResponse.requestId.trim()
+      : providerResponse.headers && typeof providerResponse.headers['x-oneapi-request-id'] === 'string' && providerResponse.headers['x-oneapi-request-id'].trim().length > 0
+        ? providerResponse.headers['x-oneapi-request-id'].trim()
+        : providerResponse.headers && typeof providerResponse.headers['X-OneAPI-Request-Id'] === 'string' && providerResponse.headers['X-OneAPI-Request-Id'].trim().length > 0
+          ? providerResponse.headers['X-OneAPI-Request-Id'].trim()
+          : undefined;
+  return { observedModel, responseId };
 }
 
 function validateRouteConfig(config) {
@@ -135,6 +171,47 @@ function resolveRoute(config, alias, options = {}) {
   };
 }
 
+function normalizeServedRoute(input, options = {}) {
+  const source = normalizeAliasValue(options.source);
+  const sourceField = normalizeAliasValue(options.sourceField);
+  const extracted = extractObservedModel(input);
+  if (!extracted) {
+    return {
+      observed: false,
+      reasonCode: 'served-route-unavailable',
+      sourceChecked: sourceField || source,
+    };
+  }
+  const servedRoute = {
+    observed: true,
+    observedModel: extracted.observedModel,
+  };
+  if (source) servedRoute.source = source;
+  if (sourceField) servedRoute.sourceField = sourceField;
+  if (extracted.responseId) servedRoute.responseId = extracted.responseId;
+  if (normalizeEndpointAlias(options.providerAlias)) servedRoute.providerAlias = normalizeEndpointAlias(options.providerAlias);
+  if (normalizeEndpointAlias(options.endpointAlias)) servedRoute.endpointAlias = normalizeEndpointAlias(options.endpointAlias);
+  return servedRoute;
+}
+
+function assertServedRouteSourceAvailable(source, input) {
+  const normalizedSource = normalizeAliasValue(source);
+  if (!normalizedSource) {
+    return { ok: false, reasonCode: 'invalid-served-route-source', sourceChecked: source };
+  }
+  if (
+    STATIC_ROUTE_SOURCE_PREFIXES.some((prefix) => normalizedSource === prefix || normalizedSource.startsWith(`${prefix}.`))
+    || !normalizedSource.endsWith(OBSERVED_MODEL_SOURCE_SUFFIX)
+  ) {
+    return { ok: false, reasonCode: 'invalid-served-route-source', sourceChecked: normalizedSource };
+  }
+  const servedRoute = normalizeServedRoute(input, { source: 'provider-response', sourceField: normalizedSource });
+  if (!servedRoute.observed) {
+    return { ok: false, reasonCode: 'served-route-source-unavailable', sourceChecked: normalizedSource };
+  }
+  return { ok: true, sourceChecked: normalizedSource, servedRoute };
+}
+
 function sanitizeResolution(resolution = {}, input = {}) {
   const event = {
     requestedAlias: resolution.alias || resolution.requestedAlias || input.requestedAlias,
@@ -149,17 +226,36 @@ function sanitizeResolution(resolution = {}, input = {}) {
     return event;
   }
   event.ok = true;
-  event.resolvedProvider = resolution.provider;
-  event.resolvedModel = resolution.model;
-  event.endpointRef = resolution.endpointRef;
+  event.configuredProvider = resolution.provider;
+  event.configuredModel = resolution.model;
+  if (normalizeEndpointAlias(input.providerAlias || resolution.providerAlias || resolution.provider)) {
+    event.providerAlias = normalizeEndpointAlias(input.providerAlias || resolution.providerAlias || resolution.provider);
+  }
+  if (normalizeEndpointAlias(input.endpointAlias || resolution.endpointRef)) {
+    event.endpointAlias = normalizeEndpointAlias(input.endpointAlias || resolution.endpointRef);
+  }
   return event;
 }
 
 function buildResolvedRouteAuditEvent(resolution, input = {}) {
-  return {
+  const event = {
     event: 'provider_route.resolved',
     ...sanitizeResolution(resolution, input),
   };
+  const servedRoute = input.servedRoute;
+  if (servedRoute && servedRoute.observed === true) {
+    event.observedModel = servedRoute.observedModel;
+    if (servedRoute.source) event.source = servedRoute.source;
+    if (servedRoute.sourceField) event.sourceField = servedRoute.sourceField;
+    if (servedRoute.responseId) event.responseId = servedRoute.responseId;
+    if (servedRoute.providerAlias && !event.providerAlias) event.providerAlias = servedRoute.providerAlias;
+    if (servedRoute.endpointAlias && !event.endpointAlias) event.endpointAlias = servedRoute.endpointAlias;
+  } else if (servedRoute) {
+    event.observedModel = null;
+    event.reasonCode = servedRoute.reasonCode || event.reasonCode;
+    if (servedRoute.sourceChecked) event.sourceChecked = servedRoute.sourceChecked;
+  }
+  return event;
 }
 
 function writeJson(filePath, value) {
@@ -184,6 +280,8 @@ module.exports = {
   validateRouteConfig,
   loadRouteConfig,
   resolveRoute,
+  normalizeServedRoute,
+  assertServedRouteSourceAvailable,
   buildResolvedRouteAuditEvent,
   writeResolvedRouteArtifact,
 };

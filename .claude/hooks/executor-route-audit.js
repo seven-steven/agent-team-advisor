@@ -6,6 +6,7 @@ const { runtimePath } = require('../advisor-mode/runtime-paths.js');
 const {
   loadRouteConfig,
   resolveRoute,
+  normalizeServedRoute,
 } = require('../advisor-mode/provider-routing.js');
 
 function getRoot(options = {}) {
@@ -56,13 +57,28 @@ function buildExecutorRouteAuditEvent(input = {}, options = {}) {
       errors: resolution.errors,
     };
   }
+  const observedRoute = normalizeServedRoute(input.providerResponse, {
+    source: 'provider-response',
+    sourceField: 'hookEvent.providerResponse.body.model',
+    providerAlias: resolution.provider,
+    endpointAlias: resolution.endpointRef,
+  });
   return {
     ...base,
     ok: true,
     resolvedProvider: resolution.provider,
     resolvedModel: resolution.model,
     endpointRef: resolution.endpointRef,
+    configuredProvider: resolution.provider,
+    configuredModel: resolution.model,
+    providerAlias: resolution.provider,
+    endpointAlias: resolution.endpointRef,
     conformanceStatus: resolution.conformanceStatus || 'unchecked',
+    observedModel: observedRoute.observed ? observedRoute.observedModel : null,
+    source: observedRoute.source,
+    sourceField: observedRoute.sourceField,
+    responseId: observedRoute.responseId,
+    observedRoute,
   };
 }
 
