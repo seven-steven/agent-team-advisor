@@ -6,7 +6,7 @@ const { runtimePath } = require('../advisor-mode/runtime-paths.js');
 const { appendAuditEvent, buildCorrelationFields } = require('../advisor-mode/audit-log.js');
 const { recordAdvisorUsage, evaluateBudget } = require('../advisor-mode/budget-state.js');
 const { evaluateOperatorRecovery } = require('../advisor-mode/operator-recovery.js');
-const { normalizeFailureSignature } = require('./advisor-failure-tracker.js');
+const { normalizeRepeatedFailureKey } = require('./advisor-failure-tracker.js');
 const {
   loadRouteConfig,
   resolveRoute,
@@ -98,15 +98,26 @@ function readPersistedFailureCount(rawEvent = {}, event = buildGateEvent(rawEven
   if (!event || event.failOpen) return { count: 0 };
   const root = getRoot(options);
   const statePath = options.failureStatePath || runtimePath(root, DEFAULT_FAILURE_STATE_FILE, options);
-  const signature = normalizeFailureSignature({
+  const repeatedFailureKey = normalizeRepeatedFailureKey({
     ...rawEvent,
     toolName: event.toolName,
     toolInput: event.toolInput,
     taskState: event.taskState,
+    actionClass: event.actionClass,
   });
   const state = readJson(statePath, { signatures: {} });
-  const count = Number(state.signatures && state.signatures[signature] && state.signatures[signature].count ? state.signatures[signature].count : 0);
-  return { count, signature, statePath };
+  const matches = Object.entries(state.signatures || {}).filter(([signature]) => signature.startsWith(`${repeatedFailureKey}|`));
+  if (matches.length === 0) return { count: 0, repeatedFailureKey, statePath };
+  let bestSignature;
+  let bestRecord = { count: 0 };
+  for (const [signature, record] of matches) {
+    const count = Number(record && record.count ? record.count : 0);
+    if (!bestSignature || count > Number(bestRecord.count || 0)) {
+      bestSignature = signature;
+      bestRecord = { ...record, count };
+    }
+  }
+  return { count: Number(bestRecord.count || 0), signature: bestSignature, repeatedFailureKey, statePath };
 }
 
 function loadPolicy(options = {}) {
