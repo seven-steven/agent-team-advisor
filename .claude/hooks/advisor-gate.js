@@ -7,6 +7,7 @@ const { normalizeFailureSignature } = require('./advisor-failure-tracker.js');
 const {
   loadRouteConfig,
   resolveRoute,
+  normalizeServedRoute,
 } = require('../advisor-mode/provider-routing.js');
 
 const GATED_MATCHER_TOOLS = new Set(['Bash', 'Edit', 'Write', 'MultiEdit']);
@@ -271,13 +272,31 @@ function buildRuntimeRouteMetadata(input = {}, options = {}) {
     resolvedProvider: resolution.provider,
     resolvedModel: resolution.model,
     endpointRef: resolution.endpointRef,
+    configuredProvider: resolution.provider,
+    configuredModel: resolution.model,
+    providerAlias: resolution.provider,
+    endpointAlias: resolution.endpointRef,
     routeConfigPath: loaded.configPath,
     conformanceStatus: resolution.conformanceStatus || 'unchecked',
   };
 }
 
+function buildAdvisorObservedRoute(input = {}, routeResolution = {}) {
+  const sourceField = 'advisorRecommendation.providerResponse.body.model';
+  const providerResponse = input.advisorRecommendation && input.advisorRecommendation.providerResponse;
+  const route = normalizeServedRoute(providerResponse, {
+    source: 'provider-response',
+    sourceField,
+    providerAlias: routeResolution.providerAlias,
+    endpointAlias: routeResolution.endpointAlias,
+  });
+  return route;
+}
+
 function buildRequest(event, classes, rule, paths, options = {}) {
   const risk = rule.risk || 'high';
+  const routeResolution = buildRuntimeRouteMetadata({ requestedAlias: event.requestedAlias || 'opus' }, options);
+  const observedRoute = buildAdvisorObservedRoute(options, routeResolution);
   const request = {
     correlationKey: paths.correlationKey,
     event: 'advisor_consultation.required',
@@ -291,7 +310,9 @@ function buildRequest(event, classes, rule, paths, options = {}) {
     consultationTiming: 'before-proceed',
     requestPath: paths.requestPath,
     recommendationPath: paths.recommendationPath,
-    routeResolution: buildRuntimeRouteMetadata({ requestedAlias: event.requestedAlias || 'opus' }, options),
+    routeResolution,
+    observedRoute,
+    observedModel: observedRoute.observed ? observedRoute.observedModel : undefined,
     advisorProducer: buildAdvisorProducerInstruction(paths.requestPath, paths.recommendationPath),
   };
   if (rule.auditLabel) request.auditLabel = rule.auditLabel;
@@ -745,6 +766,7 @@ module.exports = {
   buildAdvisorProducerInstruction,
   validateAdvisorRecommendation,
   buildRuntimeRouteMetadata,
+  buildRequest,
   buildDecisionPacket,
   writeDisposition,
   readDisposition,
