@@ -17,7 +17,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 2: Enforced Trigger Gates** - Users can rely on policy-driven advisor and human approval gates that host-block risky first attempts and require explicit retry after recommendation or disposition artifacts exist. (gap closure planned 2026-05-22) (completed 2026-05-22)
 - [x] **Phase 3: Verdict Handoff and Verification Evidence** - Users receive structured advisor guidance, executor rationale, minimized context handoffs, and verification evidence. (completed 2026-05-27)
 - [x] **Phase 4: Provider Routing and Conformance** - Maintainers can route Claude semantic aliases to third-party models and validate provider compatibility before critical flows. (verification gaps found 2026-05-28) (completed 2026-05-29)
-- [ ] **Phase 5: Audit, Budget, and Operator Recovery** - Users can inspect correlated audit history, cap advisor cost/latency, validate installation, and disable enforcement safely.
+- [x] **Phase 5: Audit, Budget, and Operator Recovery** - Users can inspect correlated audit history, cap advisor cost/latency, validate installation, and disable enforcement safely. (completed 2026-05-29)
 
 ## Phase Details
 
@@ -129,7 +129,7 @@ Plans:
 4. Project maintainer can disable advisor enforcement or switch to warning-only mode through a documented kill switch or rollback path.
 5. User can run a doctor or validation command that verifies required hooks, routes, advisor permissions, and project assets are installed correctly.
 
-**Plans:** 7/8 plans executed
+**Plans:** 8/8 plans complete
 
 Plans:
 
@@ -160,4 +160,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | 2. Enforced Trigger Gates                    | 6/6            | Complete | 2026-05-22 |
 | 3. Verdict Handoff and Verification Evidence | 7/7            | Complete | 2026-05-27 |
 | 4. Provider Routing and Conformance          | 4/4            | Complete | 2026-05-29 |
-| 5. Audit, Budget, and Operator Recovery      | 7/8 | In Progress|  |
+| 5. Audit, Budget, and Operator Recovery      | 8/8 | Complete   | 2026-05-29 |
