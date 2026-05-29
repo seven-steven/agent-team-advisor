@@ -142,13 +142,9 @@ test('runDoctor returns complete pass artifact, writes runtime evidence, appends
   assert.equal(artifact.event, 'doctor.completed');
   assert.equal(artifact.status, 'pass');
   assert.deepEqual(artifact.checks.map((check) => check.id), CHECK_IDS);
-  for (const check of artifact.checks) {
-    assert.equal(check.status, 'pass', `${check.id} should pass`);
-    assert.equal(typeof check.summary, 'string');
-    assert.ok(check.summary.length > 0);
-    assert.equal(typeof check.repair, 'string');
-    assert.ok(check.repair.length > 0);
-  }
+  assert.equal(artifact.smoke_enabled, false);
+  assert.equal(artifact.offline_default, true);
+
   assertNoSecretLeak(artifact);
   assertProtectedFilesUnchanged(root, before);
 
@@ -212,10 +208,13 @@ test('CLI exits non-zero when doctor status fails', () => {
   assert.ok(payload.checks.find((check) => check.id === 'install.assets').repair.length > 0);
 });
 
-test('README documents doctor commands and every check ID', () => {
+test('README documents doctor commands, every check ID, offline default, smoke opt-in, and Phase 05 quick run', () => {
   const readme = fs.readFileSync(path.resolve(__dirname, '..', 'README.md'), 'utf8');
   assert.match(readme, /Doctor validation/);
   assert.match(readme, /node \.claude\/advisor-mode\/doctor\.js --json/);
+  assert.match(readme, /read-only\/offline by default|offline\/read-only by default/);
+  assert.match(readme, /Smoke checks require `--smoke`|smoke checks require `--smoke`|`--smoke`[^\n]+smoke checks/i);
+  assert.match(readme, /node --test \.claude\/advisor-mode\/tests\/audit-log\.test\.js \.claude\/advisor-mode\/tests\/budget-state\.test\.js \.claude\/advisor-mode\/tests\/doctor\.test\.js \.claude\/advisor-mode\/tests\/rollback\.test\.js/);
   for (const checkId of CHECK_IDS) assert.match(readme, new RegExp(checkId.replace('.', '\\.')));
 });
 

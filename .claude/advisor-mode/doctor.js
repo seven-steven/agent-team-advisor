@@ -245,6 +245,8 @@ function buildDoctorArtifact(results, options = {}) {
     event: 'doctor.completed',
     checked_at: options.now || new Date().toISOString(),
     status: checks.every((check) => check.status === 'pass') ? 'pass' : 'fail',
+    smoke_enabled: options.smoke === true,
+    offline_default: options.smoke !== true,
     checks,
   };
 }
