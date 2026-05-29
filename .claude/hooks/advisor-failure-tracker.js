@@ -64,15 +64,21 @@ function getErrorClass(text) {
   return match ? match[1] : 'unknown-error';
 }
 
-function normalizeFailureSignature(payload = {}) {
+function normalizeRepeatedFailureKey(payload = {}) {
   const toolName = pick(payload.toolName, payload.tool_name, 'unknown-tool');
-  const exitCode = String(getExitCode(payload));
   const command = String((payload.toolInput || payload.tool_input || {}).command || '');
   const actionClass = pick(payload.actionClass, payload.action_class, command ? 'command' : 'unknown-action');
+  const taskState = pick(payload.taskState, payload.task_state, 'unknown');
+  return `tool:${toolName}|action:${actionClass}|task:${taskState}|command:${normalizeVolatileText(command)}`;
+}
+
+function normalizeFailureSignature(payload = {}) {
+  const repeatedFailureKey = normalizeRepeatedFailureKey(payload);
+  const exitCode = String(getExitCode(payload));
   const text = getOutputText(payload);
   const normalizedText = normalizeVolatileText(text);
   const errorClass = getErrorClass(text);
-  return `tool:${toolName}|exit:${exitCode}|action:${actionClass}|error:${errorClass}|text:${normalizedText}`;
+  return `${repeatedFailureKey}|exit:${exitCode}|error:${errorClass}|text:${normalizedText}`;
 }
 
 function readJson(filePath, fallback) {
@@ -212,6 +218,7 @@ if (require.main === module) main();
 
 module.exports = {
   getExitCode,
+  normalizeRepeatedFailureKey,
   normalizeFailureSignature,
   isFailure,
   updateFailureState,

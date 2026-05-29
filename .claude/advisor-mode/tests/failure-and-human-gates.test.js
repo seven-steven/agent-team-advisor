@@ -155,7 +155,7 @@ test('failure normalization strips volatile data while preserving material class
   assert.doesNotMatch(a, /home|var|2026|2027|aaaaaaaa|bbbbbbbb|12345|67890|:10|:987/);
 });
 
-test('evaluateGatePolicy reads persisted repeated failure state using tracker signature key', () => {
+test('evaluateGatePolicy reads persisted repeated failure state for real PreToolUse retries without PostToolUse error payload', () => {
   const root = makeTempRoot('advisor-failure-evaluate-');
   const payload = failurePayload();
   failureTracker.trackFailure(payload, { root });
@@ -171,10 +171,9 @@ test('evaluateGatePolicy reads persisted repeated failure state using tracker si
       hookEventName: 'PreToolUse',
       toolName: payload.toolName,
       toolInput: payload.toolInput,
-      toolResponse: payload.toolResponse,
       taskState: payload.taskState,
       actionClass: payload.actionClass,
-      failureCount: 2,
+      failureCount: 0,
     },
     { root, policy },
   );
@@ -185,6 +184,7 @@ test('evaluateGatePolicy reads persisted repeated failure state using tracker si
   assert.equal(result.failureSignature, trackerSignature);
   assert.equal(result.failureCount, 2);
 });
+
 
 test('critical D-10 classes emit human approval only after matching advisor recommendation exists', () => {
   const root = makeTempRoot();
