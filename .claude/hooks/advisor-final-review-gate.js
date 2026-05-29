@@ -10,6 +10,7 @@ const {
 const { runtimePath } = require('../advisor-mode/runtime-paths.js');
 const { appendAuditEvent } = require('../advisor-mode/audit-log.js');
 const { evaluateBudget } = require('../advisor-mode/budget-state.js');
+const { evaluateOperatorRecovery } = require('../advisor-mode/operator-recovery.js');
 
 function readAdvisorHookConfig(rootDir) {
   try {
@@ -122,8 +123,10 @@ function auditFinalReviewResult(result = {}, event = {}, options = {}) {
 
 function evaluateFinalReviewGate(event = {}, options = {}) {
   const root = getRoot(options);
-  if (!isAdvisorModeEnabled(root)) return auditFinalReviewResult({ gateAction: 'none', reasonCode: 'advisor-mode-disabled' }, event, options);
-  const strictMode = isAdvisorModeStrict(root);
+  const recovery = evaluateOperatorRecovery(event, { ...options, root, capability: 'finalReview' });
+  if (recovery.mode === 'disabled') return auditFinalReviewResult({ gateAction: 'none', reasonCode: 'advisor-mode-disabled' }, event, options);
+  if (!recovery.capabilityEnabled) return auditFinalReviewResult({ gateAction: 'none', reasonCode: 'operator-capability-disabled' }, event, options);
+  const strictMode = recovery.mode === 'enforce';
   if (!isExplicitNonTrivialCompletion(event)) return auditFinalReviewResult({ gateAction: 'none', reasonCode: 'not-explicit-non-trivial-completion' }, event, options);
   let budgetStatus;
   try {
