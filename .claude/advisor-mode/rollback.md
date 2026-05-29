@@ -72,6 +72,11 @@ Implemented capability keys:
 
 Budget over-limit degraded mode keeps mandatory safety gates active. Non-critical advisor consultation can downgrade to advisory, but final review and critical human approval remain mandatory unless the global disabled/kill-switch is active.
 
+Recovery controls apply to both enforcement surfaces:
+
+- `.claude/hooks/advisor-gate.js` for PreToolUse advisor consultation, critical human approval, and protected-surface gates.
+- `.claude/hooks/advisor-final-review-gate.js` for Stop final-review enforcement.
+
 ## Protected governance surfaces
 
 Rollback controls are protected governance surfaces. When enforcement is enabled, changes to these paths continue to require protected-surface review:

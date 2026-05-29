@@ -174,7 +174,7 @@ test('recovery mode checks append operator_recovery.mode_checked audit events', 
   assert.equal(event.capabilities.advisorConsultation, true);
 });
 
-test('rollback documentation contains exact modes config keys and capability classes', () => {
+test('rollback documentation contains exact modes config keys capability classes and enforcement surfaces', () => {
   const rollback = fs.readFileSync(path.join(repoRoot, '.claude', 'advisor-mode', 'rollback.md'), 'utf8');
 
   for (const text of ['advisor_mode', 'advisor_mode_strict', 'enforce', 'warning-only', 'disabled/kill-switch']) {
@@ -182,6 +182,9 @@ test('rollback documentation contains exact modes config keys and capability cla
   }
   for (const capability of ['advisorConsultation', 'finalReview', 'criticalHumanApproval', 'protectedSurfaces']) {
     assert.match(rollback, new RegExp(capability));
+  }
+  for (const hookPath of ['.claude/hooks/advisor-gate.js', '.claude/hooks/advisor-final-review-gate.js']) {
+    assert.equal(rollback.includes(hookPath), true, hookPath);
   }
   for (const protectedPath of ['.planning/config.json', '.claude/hooks/', '.claude/settings.json', '.claude/advisor-mode/*.json']) {
     assert.equal(rollback.includes(protectedPath), true, protectedPath);
