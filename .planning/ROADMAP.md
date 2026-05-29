@@ -128,17 +128,36 @@ Plans:
 3. User can set hard limits for advisor calls, advisor tokens, or advisor latency per task or session.
 4. Project maintainer can disable advisor enforcement or switch to warning-only mode through a documented kill switch or rollback path.
 5. User can run a doctor or validation command that verifies required hooks, routes, advisor permissions, and project assets are installed correctly.
-   **Plans**: TBD
+
+**Plans:** 4 plans
+
+Plans:
+
+**Wave 1**
+
+- [ ] 05-01-PLAN.md — Implement append-only raw audit and task/session correlated views.
+
+**Wave 2** _(blocked on Wave 1 audit helper)_
+
+- [ ] 05-02-PLAN.md — Enforce advisor call, token, and latency budgets by task/session scope with degraded audit mode.
+
+**Wave 3** _(blocked on Wave 1 audit helper and Wave 2 budget state)_
+
+- [ ] 05-03-PLAN.md — Add layered enforce, warning-only, disabled, and degraded recovery controls while preserving mandatory gates.
+
+**Wave 4** _(blocked on Waves 1-3 operational primitives)_
+
+- [ ] 05-04-PLAN.md — Provide read-only doctor validation for hooks, routes, advisor permissions, runtime paths, budget policy, and recovery mode.
 
 ## Progress
 
 **Execution Order:**
 Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 
-| Phase                                        | Plans Complete | Status      | Completed  |
-| -------------------------------------------- | -------------- | ----------- | ---------- |
-| 1. Repo-Scoped Advisor Foundation            | 4/4            | Complete    | 2026-05-19 |
-| 2. Enforced Trigger Gates                    | 6/6            | Complete    | 2026-05-22 |
-| 3. Verdict Handoff and Verification Evidence | 7/7            | Complete    | 2026-05-27 |
-| 4. Provider Routing and Conformance          | 4/4 | Complete   | 2026-05-29 |
-| 5. Audit, Budget, and Operator Recovery      | 0/TBD          | Not started | -          |
+| Phase                                        | Plans Complete | Status   | Completed  |
+| -------------------------------------------- | -------------- | -------- | ---------- |
+| 1. Repo-Scoped Advisor Foundation            | 4/4            | Complete | 2026-05-19 |
+| 2. Enforced Trigger Gates                    | 6/6            | Complete | 2026-05-22 |
+| 3. Verdict Handoff and Verification Evidence | 7/7            | Complete | 2026-05-27 |
+| 4. Provider Routing and Conformance          | 4/4            | Complete | 2026-05-29 |
+| 5. Audit, Budget, and Operator Recovery      | 0/4            | Planned  | -          |

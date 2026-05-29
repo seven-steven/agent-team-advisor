@@ -341,22 +341,19 @@ function hasHook(settings, eventName, commandPart) {
 | A4  | Audit helper should reject/strip sensitive fields.                              | Pattern 1                   | Security risk if sensitive provider payloads are written to local audit logs.                                     |
 | A5  | Count consultation creation/verdict receipt, not satisfied reentry, for budget. | Pitfall 2                   | Incorrect accounting may block valid retries or allow loops.                                                      |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **What exact budget defaults should ship in MVP?**
-   - What we know: Requirement allows hard limits for advisor calls, tokens, or latency per task/session. [VERIFIED: .planning/REQUIREMENTS.md]
-   - What's unclear: Default numeric limits are not specified. [VERIFIED: codebase]
-   - Recommendation: Planner should set conservative example defaults in `policy.example.json` and make tests validate configurability, not a universal hard-coded threshold. [ASSUMED]
+1. **What exact budget defaults should ship in MVP? — RESOLVED**
+   - Resolution: Ship example, configurable defaults in `policy.example.json`: task caps `{ advisorCalls: 2, advisorTokens: 1000, advisorLatencyMs: 30000 }` and session caps `{ advisorCalls: 5, advisorTokens: 5000, advisorLatencyMs: 120000 }`. These are policy examples, not hard-coded universal thresholds. [RESOLVED: 05-02-PLAN.md]
+   - Planner impact: Tests validate configurability and triple-cap behavior, not that these numbers are intrinsically correct for every project. [RESOLVED]
 
-2. **Where does `sessionId` come from in real Claude Code hook input?**
-   - What we know: Existing code accepts raw hook input and normalizes known fields like `hookEventName`, `toolName`, `toolInput`, and task state. [VERIFIED: codebase]
-   - What's unclear: Current code does not show a canonical session identifier field from host input. [VERIFIED: codebase]
-   - Recommendation: Accept `sessionId`, `session_id`, env fallback, or generated runtime session state; tag source in audit. [ASSUMED]
+2. **Where does `sessionId` come from in real Claude Code hook input? — RESOLVED**
+   - Resolution: Producers must accept `sessionId`, `session_id`, `correlationKey`, `taskId`, `task_id`, options/env fallbacks where available, and deterministic fallback correlation from stable hook/artifact material when host input lacks one. Audit events must record the source/degradation behavior through `buildCorrelationFields`. [RESOLVED: 05-01-PLAN.md]
+   - Planner impact: Phase 5 does not depend on a single Claude Code host field; it propagates both task and session keys whenever available and degrades explicitly when one is missing. [RESOLVED]
 
-3. **Should doctor perform live provider calls?**
-   - What we know: Phase 04 live conformance command already exists and requires operator-owned env vars. [VERIFIED: codebase]
-   - What's unclear: SETP-02 says verify routes, not necessarily call live provider every doctor run. [VERIFIED: .planning/REQUIREMENTS.md]
-   - Recommendation: Default doctor to offline checks plus conformance artifact status; add `--live` or recommend existing conformance command for live verification. [ASSUMED]
+3. **Should doctor perform live provider calls? — RESOLVED**
+   - Resolution: Doctor defaults to offline/read-only checks plus existing provider conformance artifact status. Targeted smoke checks are available through explicit `--smoke`/mocked check paths and must not require live provider credentials by default. Live provider verification remains the responsibility of the existing provider conformance command. [RESOLVED: 05-04-PLAN.md]
+   - Planner impact: SETP-02 is satisfied by deep install/runtime/config validation without surprise provider calls or secret requirements. [RESOLVED]
 
 ## Environment Availability
 
