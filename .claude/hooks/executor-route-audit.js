@@ -3,6 +3,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const { runtimePath } = require('../advisor-mode/runtime-paths.js');
+const { appendAuditEvent, buildCorrelationFields } = require('../advisor-mode/audit-log.js');
 const {
   loadRouteConfig,
   resolveRoute,
@@ -37,6 +38,7 @@ function buildExecutorRouteAuditEvent(input = {}, options = {}) {
     routeConfigPath: configPath,
     recordedAt: options.now || new Date().toISOString(),
     runtimeCorrelationId: runtimeCorrelationId(input),
+    ...buildCorrelationFields(input, options),
   };
   if (!loaded.ok) {
     return {
@@ -92,11 +94,9 @@ function recordExecutorRouteResolution(input = {}, options = {}) {
   const event = buildExecutorRouteAuditEvent(input, options);
   const safeId = event.runtimeCorrelationId.replace(/[^A-Za-z0-9._-]/g, '-');
   const artifactPath = options.artifactPath || runtimePath(root, ['runtime', 'executor-calls', `${safeId}.json`], options);
-  const auditPath = options.auditPath || runtimePath(root, ['audit', 'events.jsonl'], options);
   writeJson(artifactPath, event);
-  fs.mkdirSync(path.dirname(auditPath), { recursive: true });
-  fs.appendFileSync(auditPath, `${JSON.stringify(event)}\n`);
-  return { ...event, artifactPath, auditPath };
+  const audit = appendAuditEvent(event, { ...options, root });
+  return { ...event, artifactPath, auditPath: audit.auditPath };
 }
 
 function parseInput(input) {
