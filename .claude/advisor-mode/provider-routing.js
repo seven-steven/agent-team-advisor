@@ -1,6 +1,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { runtimePath } = require('./runtime-paths.js');
+const { appendAuditEvent } = require('./audit-log.js');
 
 const ROUTE_SCHEMA_PATH = path.join(__dirname, 'provider-routes.schema.json');
 const DEFAULT_ROUTE_PATH = path.join('.claude', 'advisor-mode', 'provider-routes.example.json');
@@ -269,9 +270,7 @@ function writeResolvedRouteArtifact(resolution, options = {}) {
   const artifactPath = options.artifactPath || runtimePath(root, ['state', 'provider-route.json'], options);
   writeJson(artifactPath, event);
   if (options.appendAudit === true) {
-    const auditPath = options.auditPath || runtimePath(root, ['audit', 'events.jsonl'], options);
-    fs.mkdirSync(path.dirname(auditPath), { recursive: true });
-    fs.appendFileSync(auditPath, `${JSON.stringify(event)}\n`);
+    appendAuditEvent(event, options);
   }
   return { ok: true, path: artifactPath, artifact: event };
 }
