@@ -16,6 +16,7 @@ const {
   filterAuditEvents,
   buildCorrelationFields,
   sanitizeAuditEvent,
+  main,
 } = require('../audit-log.js');
 
 function tempRuntime() {
@@ -70,6 +71,16 @@ function validRecommendation(input, requestPath) {
   };
 }
 
+function captureMain(argv) {
+  let stdout = '';
+  let stderr = '';
+  const status = main(argv, {
+    stdout: { write: (chunk) => { stdout += chunk; } },
+    stderr: { write: (chunk) => { stderr += chunk; } },
+  });
+  return { status, stdout, stderr, json: JSON.parse(stdout) };
+}
+
 test('appendAuditEvent appends compact JSON lines without rewriting prior events', () => {
   const ctx = tempRuntime();
 
@@ -86,18 +97,18 @@ test('appendAuditEvent appends compact JSON lines without rewriting prior events
   assert.deepEqual(secondLines.map((line) => JSON.parse(line).event), ['advisor.triggered', 'provider_route.executor_call']);
 });
 
-test('buildCorrelationFields preserves dual keys and degrades deterministically', () => {
+test('buildCorrelationFields preserves dual keys and records degraded fallback metadata separately', () => {
   assert.deepEqual(
     buildCorrelationFields({ correlationKey: 'corr-1', taskId: 'task-1', sessionId: 'sess-1' }),
     { correlationKey: 'corr-1', taskId: 'task-1', sessionId: 'sess-1' },
   );
   assert.deepEqual(
     buildCorrelationFields({ task_id: 'task-1' }),
-    { correlationKey: 'task-1', taskId: 'task-1' },
+    { correlationKey: 'task-1', taskId: 'task-1', correlationFallback: { source: 'taskId', reason: 'explicit-correlation-key-unavailable' } },
   );
   assert.deepEqual(
     buildCorrelationFields({ session_id: 'sess-1' }),
-    { correlationKey: 'sess-1', sessionId: 'sess-1' },
+    { correlationKey: 'sess-1', sessionId: 'sess-1', correlationFallback: { source: 'sessionId', reason: 'explicit-correlation-key-unavailable' } },
   );
   assert.deepEqual(
     buildCorrelationFields({ correlationKey: 'corr-only' }),
@@ -107,12 +118,15 @@ test('buildCorrelationFields preserves dual keys and degrades deterministically'
   const fallbackB = buildCorrelationFields({ toolName: 'Bash', event: 'advisor.triggered' });
   assert.match(fallbackA.correlationKey, /^audit-[a-f0-9]{24}$/);
   assert.equal(fallbackA.correlationKey, fallbackB.correlationKey);
+  assert.equal(fallbackA.taskId, undefined);
+  assert.equal(fallbackA.sessionId, undefined);
+  assert.deepEqual(fallbackA.correlationFallback, { source: 'deterministic-hash', reason: 'first-class-correlation-fields-unavailable' });
 });
 
-test('readAuditEvents and filterAuditEvents provide raw task and session views', () => {
+test('readAuditEvents filterAuditEvents and main provide raw task session and correlation views', () => {
   const ctx = tempRuntime();
   appendAuditEvent({ event: 'advisor_verdict.recorded', correlationKey: 'corr-1', taskId: 'task-1', sessionId: 'sess-1' }, ctx);
-  appendAuditEvent({ event: 'executor_decision.recorded', correlationKey: 'corr-2', taskId: 'task-2', sessionId: 'sess-1' }, ctx);
+  appendAuditEvent({ event: 'executor.final_review_decision.recorded', correlationKey: 'corr-2', taskId: 'task-2', sessionId: 'sess-1' }, ctx);
   appendAuditEvent({ event: 'final_review_gate.evaluated', correlationKey: 'corr-3', taskId: 'task-1', sessionId: 'sess-2' }, ctx);
 
   const { events, parseErrors } = readAuditEvents(ctx);
@@ -124,8 +138,18 @@ test('readAuditEvents and filterAuditEvents provide raw task and session views',
   ]);
   assert.deepEqual(filterAuditEvents(events, { sessionId: 'sess-1' }).map((event) => event.event), [
     'advisor_verdict.recorded',
-    'executor_decision.recorded',
+    'executor.final_review_decision.recorded',
   ]);
+  assert.equal(captureMain(['raw', '--root', ctx.root, '--runtime-root', ctx.runtimeRoot]).json.count, 3);
+  assert.deepEqual(captureMain(['task', '--root', ctx.root, '--runtime-root', ctx.runtimeRoot, '--task-id', 'task-1']).json.events.map((event) => event.event), [
+    'advisor_verdict.recorded',
+    'final_review_gate.evaluated',
+  ]);
+  assert.deepEqual(captureMain(['session', '--root', ctx.root, '--runtime-root', ctx.runtimeRoot, '--session-id', 'sess-1']).json.events.map((event) => event.event), [
+    'advisor_verdict.recorded',
+    'executor.final_review_decision.recorded',
+  ]);
+  assert.equal(captureMain(['raw', '--root', ctx.root, '--runtime-root', ctx.runtimeRoot, '--correlation-key', 'corr-2']).json.events[0].taskId, 'task-2');
 });
 
 test('sanitizeAuditEvent removes secret-bearing fields and token-like values', () => {

@@ -52,15 +52,32 @@ function sanitizeAuditEvent(value) {
 function buildCorrelationFields(input = {}, options = {}) {
   const sessionId = nonEmpty(input.sessionId) || nonEmpty(input.session_id) || nonEmpty(options.sessionId) || nonEmpty(options.session_id);
   const taskId = nonEmpty(input.taskId) || nonEmpty(input.task_id) || nonEmpty(options.taskId) || nonEmpty(options.task_id);
-  const correlationKey = nonEmpty(input.correlationKey)
-    || nonEmpty(options.correlationKey)
-    || sessionId
-    || taskId
-    || `audit-${crypto.createHash('sha256').update(stableStringify(input)).digest('hex').slice(0, 24)}`;
-  const fields = { correlationKey };
-  if (taskId) fields.taskId = taskId;
-  if (sessionId) fields.sessionId = sessionId;
-  return fields;
+  const explicitCorrelationKey = nonEmpty(input.correlationKey) || nonEmpty(options.correlationKey);
+  if (explicitCorrelationKey) {
+    const fields = { correlationKey: explicitCorrelationKey };
+    if (taskId) fields.taskId = taskId;
+    if (sessionId) fields.sessionId = sessionId;
+    return fields;
+  }
+  if (sessionId || taskId) {
+    const fields = {
+      correlationKey: sessionId || taskId,
+      correlationFallback: {
+        source: sessionId ? 'sessionId' : 'taskId',
+        reason: 'explicit-correlation-key-unavailable',
+      },
+    };
+    if (taskId) fields.taskId = taskId;
+    if (sessionId) fields.sessionId = sessionId;
+    return fields;
+  }
+  return {
+    correlationKey: `audit-${crypto.createHash('sha256').update(stableStringify(input)).digest('hex').slice(0, 24)}`,
+    correlationFallback: {
+      source: 'deterministic-hash',
+      reason: 'first-class-correlation-fields-unavailable',
+    },
+  };
 }
 
 function resolveAuditPath(options = {}) {
