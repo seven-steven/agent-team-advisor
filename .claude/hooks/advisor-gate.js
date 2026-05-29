@@ -3,6 +3,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const { runtimePath } = require('../advisor-mode/runtime-paths.js');
+const { appendAuditEvent, buildCorrelationFields } = require('../advisor-mode/audit-log.js');
 const { normalizeFailureSignature } = require('./advisor-failure-tracker.js');
 const {
   loadRouteConfig,
@@ -31,9 +32,15 @@ function stableStringify(value) {
 function normalizeEvent(raw) {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
   const toolName = raw.toolName || raw.tool_name;
+  const correlationFields = buildCorrelationFields(raw);
+  const explicitCorrelationFields = {};
+  if (raw.correlationKey || raw.correlation_key) explicitCorrelationFields.correlationKey = correlationFields.correlationKey;
+  if (correlationFields.taskId) explicitCorrelationFields.taskId = correlationFields.taskId;
+  if (correlationFields.sessionId) explicitCorrelationFields.sessionId = correlationFields.sessionId;
   if (!toolName) {
     return {
       hookEventName: raw.hookEventName || raw.hook_event_name || 'PreToolUse',
+      ...explicitCorrelationFields,
       failOpen: true,
       reasonCode: 'missing-tool-name',
     };
@@ -45,6 +52,7 @@ function normalizeEvent(raw) {
     taskState: raw.taskState || raw.task_state || 'unknown',
     failureCount: Number(raw.failureCount ?? raw.failure_count ?? 0),
     actionClass: raw.actionClass || raw.action_class,
+    ...explicitCorrelationFields,
     failOpen: false,
   };
 }
@@ -433,6 +441,8 @@ function buildDecisionPacket(input = {}, options = {}) {
   const dispositionPath = getDispositionPath(correlationKey, options);
   const request = {
     correlationKey,
+    taskId: input.taskId || input.task_id || options.taskId,
+    sessionId: input.sessionId || input.session_id || options.sessionId,
     event: 'advisor_consultation.required',
     triggerReason: input.triggerReason || 'Critical human decision requires read-only advisor recommendation first.',
     risk: input.riskLevel || input.risk || 'critical',
@@ -470,6 +480,8 @@ function buildDecisionPacket(input = {}, options = {}) {
 
   const packet = {
     correlationKey,
+    taskId: request.taskId,
+    sessionId: request.sessionId,
     event: 'human_approval.required',
     triggerReason: request.triggerReason,
     decisionSummary: input.decisionSummary || request.triggerReason,
@@ -503,12 +515,15 @@ function writeDisposition(dispositionInput = {}, options = {}) {
     disposition: dispositionInput.disposition,
     decidedBy: dispositionInput.decidedBy,
     decidedAt: dispositionInput.decidedAt || new Date().toISOString(),
+    taskId: dispositionInput.taskId || dispositionInput.task_id || options.taskId,
+    sessionId: dispositionInput.sessionId || dispositionInput.session_id || options.sessionId,
     rationale: dispositionInput.rationale,
     appliesTo: dispositionInput.appliesTo,
   };
   if (Array.isArray(dispositionInput.conditions)) artifact.conditions = dispositionInput.conditions;
   fs.mkdirSync(path.dirname(artifactPath), { recursive: true });
   fs.writeFileSync(artifactPath, `${JSON.stringify(artifact, null, 2)}\n`);
+  writeAudit(artifact, options);
   return { ...artifact, path: artifactPath };
 }
 
@@ -566,19 +581,37 @@ function hardStop(reasonCode, message) {
   };
 }
 
+function writeAudit(event, options = {}) {
+  try {
+    appendAuditEvent(event, options);
+  } catch {
+    // Hook decisions must not fail solely because audit persistence failed.
+  }
+}
+
+function auditGateResult(result = {}, options = {}) {
+  if (result.event === 'advisor_consultation.required') {
+    writeAudit({ ...result, event: 'advisor.triggered' }, options);
+  }
+  if (result.gateAction && result.gateAction !== 'none') {
+    writeAudit({ ...result, event: 'hook_decision.recorded' }, options);
+  }
+  return result;
+}
+
 function evaluateGatePolicy(rawEvent, options = {}) {
   const root = getRoot(options);
-  if (!isAdvisorModeEnabled(root)) return { gateAction: 'none', reasonCode: 'advisor-mode-disabled' };
+  if (!isAdvisorModeEnabled(root)) return auditGateResult({ gateAction: 'none', reasonCode: 'advisor-mode-disabled' }, options);
   const strictMode = isAdvisorModeStrict(root);
   const event = buildGateEvent(rawEvent);
-  if (event.failOpen) return { gateAction: 'none', failOpen: true, reasonCode: event.reasonCode };
-  if (!GATED_MATCHER_TOOLS.has(event.toolName)) return { gateAction: 'none' };
+  if (event.failOpen) return auditGateResult({ gateAction: 'none', failOpen: true, reasonCode: event.reasonCode }, options);
+  if (!GATED_MATCHER_TOOLS.has(event.toolName)) return auditGateResult({ gateAction: 'none' }, options);
 
   let policy;
   try {
     policy = loadPolicy(options);
   } catch (error) {
-    return hardStop('policy-load-failed', 'Advisor Mode policy could not be loaded; blocking configured gate event.');
+    return auditGateResult(hardStop('policy-load-failed', 'Advisor Mode policy could not be loaded; blocking configured gate event.'), options);
   }
 
   let classes;
@@ -591,11 +624,11 @@ function evaluateGatePolicy(rawEvent, options = {}) {
       pathClass: classifyPathClass(event.toolName, event.toolInput, policy),
     };
   } catch (error) {
-    return hardStop('classification-failed', 'Advisor Mode risk classification failed; blocking configured gate event.');
+    return auditGateResult(hardStop('classification-failed', 'Advisor Mode risk classification failed; blocking configured gate event.'), options);
   }
 
   const rule = matchingRule(event, classes, policy);
-  if (!rule) return { gateAction: 'none', classes };
+  if (!rule) return auditGateResult({ gateAction: 'none', classes }, options);
 
   const paths = getConsultationPaths(event, options);
   const request = buildRequest(event, classes, rule, paths, options);
@@ -603,6 +636,8 @@ function evaluateGatePolicy(rawEvent, options = {}) {
     const decisionPacket = buildDecisionPacket(
       {
         correlationKey: paths.correlationKey,
+        taskId: event.taskId,
+        sessionId: event.sessionId,
         decisionClass: classes.actionClass,
         toolName: event.toolName,
         toolClass: classes.toolClass,
@@ -618,7 +653,7 @@ function evaluateGatePolicy(rawEvent, options = {}) {
     if (decisionPacket.gateAction === 'hard-stop') return decisionPacket;
     if (decisionPacket.workflowGateStatus === 'blocked-pending-advisor') {
       return strictMode
-        ? {
+        ? auditGateResult({
             ...decisionPacket,
             gateAction: 'block',
             policyRuleId: rule.id,
@@ -628,8 +663,8 @@ function evaluateGatePolicy(rawEvent, options = {}) {
               'Advisor consultation is required before this critical workflow path proceeds. Retry only after the recommendation artifact exists and validates.',
               `Advisor request: ${paths.requestPath}\nAdvisor recommendation: ${paths.recommendationPath}\n${decisionPacket.advisorProducer.instruction}`,
             ),
-          }
-        : advisoryOnlyResult(
+          }, options)
+        : auditGateResult(advisoryOnlyResult(
             {
               ...decisionPacket,
               workflowGateStatus: 'advisory-pending-advisor',
@@ -638,13 +673,13 @@ function evaluateGatePolicy(rawEvent, options = {}) {
             },
             'Advisor consultation is recommended before this critical workflow path proceeds.',
             `Advisor request: ${paths.requestPath}\nAdvisor recommendation: ${paths.recommendationPath}`,
-          );
+          ), options);
     }
     const reentry = evaluateHumanGateReentry(decisionPacket, options);
     if (reentry.workflowGateStatus === 'satisfied') {
-      return { ...decisionPacket, ...reentry, gateAction: 'allow', policyRuleId: rule.id };
+      return auditGateResult({ ...decisionPacket, ...reentry, gateAction: 'allow', policyRuleId: rule.id }, options);
     }
-    return strictMode
+    return auditGateResult(strictMode
       ? { ...decisionPacket, ...reentry, gateAction: 'block', policyRuleId: rule.id }
       : advisoryOnlyResult(
           {
@@ -654,12 +689,12 @@ function evaluateGatePolicy(rawEvent, options = {}) {
             policyRuleId: rule.id,
           },
           'Human approval disposition is recommended before retrying this workflow path.',
-        );
+        ), options);
   }
 
   const readResult = readAdvisorRecommendation(paths.recommendationPath);
   if (readResult.ok && validateAdvisorRecommendation(readResult.recommendation, request)) {
-    return {
+    return auditGateResult({
       gateAction: 'allow',
       workflowGateStatus: 'satisfied',
       retryRequired: true,
@@ -678,16 +713,16 @@ function evaluateGatePolicy(rawEvent, options = {}) {
       failureSignature: persistedFailure.signature,
       failureCount: event.failureCount,
       hookOutput: buildDecision('allow', 'Valid read-only advisor recommendation exists; explicit retry may proceed.'),
-    };
+    }, options);
   }
 
   try {
     writeConsultationRequest(request);
   } catch (error) {
-    return hardStop('request-write-failed', 'Advisor Mode consultation request could not be written; blocking configured gate event.');
+    return auditGateResult(hardStop('request-write-failed', 'Advisor Mode consultation request could not be written; blocking configured gate event.'), options);
   }
 
-  return strictMode
+  return auditGateResult(strictMode
     ? {
         gateAction: 'block',
         workflowGateStatus: 'blocked-pending-advisor',
@@ -725,7 +760,7 @@ function evaluateGatePolicy(rawEvent, options = {}) {
         },
         'Advisor consultation is recommended before this high-risk workflow path proceeds.',
         `Advisor request: ${paths.requestPath}\nAdvisor recommendation: ${paths.recommendationPath}`,
-      );
+      ), options);
 }
 
 function parseInput(input) {

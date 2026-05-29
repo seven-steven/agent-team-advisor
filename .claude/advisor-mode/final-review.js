@@ -1,6 +1,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { runtimePath } = require('./runtime-paths.js');
+const { appendAuditEvent } = require('./audit-log.js');
 
 const VERDICT_SCHEMA_PATH = path.join(__dirname, 'verdict.schema.json');
 const VALID_VERDICT_VALUES = {
@@ -276,6 +277,8 @@ function validateExecutorDecision(artifact, verdict) {
   const allowedFields = new Set([
     'artifact_type',
     'correlationKey',
+    'taskId',
+    'sessionId',
     'verdict_ref',
     'executor_decisions',
     'created_at',
@@ -364,18 +367,16 @@ function writeJson(filePath, value) {
 }
 
 function appendExecutorDecisionAudit(artifact, artifactPath, options = {}) {
-  const root = options.root || process.cwd();
-  const auditPath = options.auditPath || runtimePath(root, ['audit', 'events.jsonl'], options);
-  fs.mkdirSync(path.dirname(auditPath), { recursive: true });
-  fs.appendFileSync(
-    auditPath,
-    `${JSON.stringify({
-      timestamp: new Date().toISOString(),
+  appendAuditEvent(
+    {
       event: 'executor.final_review_decision.recorded',
       correlationKey: artifact.correlationKey,
+      taskId: options.taskId || artifact.taskId,
+      sessionId: options.sessionId || artifact.sessionId,
       artifactPath,
       decisionCount: artifact.executor_decisions.length,
-    })}\n`,
+    },
+    options,
   );
 }
 
@@ -388,6 +389,8 @@ function recordExecutorDecision(input = {}, options = {}) {
   const artifact = {
     artifact_type: 'executor-decision',
     correlationKey,
+    taskId: input.taskId || input.task_id,
+    sessionId: input.sessionId || input.session_id,
     verdict_ref: input.verdict_ref || runtimePath(options.root || process.cwd(), ['verdicts', `${correlationKey}.json`], options),
     executor_decisions: decisions.map((decision) => ({
       recommendation_id: decision.recommendation_id,
@@ -420,6 +423,8 @@ function validateVerificationEvidence(artifact) {
   const allowedFields = new Set([
     'artifact_type',
     'correlationKey',
+    'taskId',
+    'sessionId',
     'verdict_ref',
     'executor_decision_ref',
     'commands',
@@ -485,20 +490,18 @@ function validateVerificationEvidence(artifact) {
 }
 
 function appendVerificationEvidenceAudit(artifact, artifactPath, options = {}) {
-  const root = options.root || process.cwd();
-  const auditPath = options.auditPath || runtimePath(root, ['audit', 'events.jsonl'], options);
-  fs.mkdirSync(path.dirname(auditPath), { recursive: true });
-  fs.appendFileSync(
-    auditPath,
-    `${JSON.stringify({
-      timestamp: new Date().toISOString(),
+  appendAuditEvent(
+    {
       event: 'verification.evidence.recorded',
       correlationKey: artifact.correlationKey,
+      taskId: options.taskId || artifact.taskId,
+      sessionId: options.sessionId || artifact.sessionId,
       artifactPath,
       commandCount: artifact.commands.length,
       changedFileCount: artifact.changed_files.length,
       residualRiskCount: artifact.residual_risks.length,
-    })}\n`,
+    },
+    options,
   );
 }
 
@@ -509,6 +512,8 @@ function recordVerificationEvidence(input = {}, options = {}) {
   const artifact = {
     artifact_type: 'verification-evidence',
     correlationKey,
+    taskId: input.taskId || input.task_id,
+    sessionId: input.sessionId || input.session_id,
     commands: Array.isArray(input.commands)
       ? input.commands.map((command) => ({
           purpose: command.purpose,

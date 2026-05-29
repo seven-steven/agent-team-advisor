@@ -126,7 +126,7 @@ test('buildCorrelationFields preserves dual keys and records degraded fallback m
 test('readAuditEvents filterAuditEvents and main provide raw task session and correlation views', () => {
   const ctx = tempRuntime();
   appendAuditEvent({ event: 'advisor_verdict.recorded', correlationKey: 'corr-1', taskId: 'task-1', sessionId: 'sess-1' }, ctx);
-  appendAuditEvent({ event: 'executor_decision.recorded', correlationKey: 'corr-2', taskId: 'task-2', sessionId: 'sess-1' }, ctx);
+  appendAuditEvent({ event: 'executor.final_review_decision.recorded', correlationKey: 'corr-2', taskId: 'task-2', sessionId: 'sess-1' }, ctx);
   appendAuditEvent({ event: 'final_review_gate.evaluated', correlationKey: 'corr-3', taskId: 'task-1', sessionId: 'sess-2' }, ctx);
 
   const { events, parseErrors } = readAuditEvents(ctx);
@@ -138,7 +138,7 @@ test('readAuditEvents filterAuditEvents and main provide raw task session and co
   ]);
   assert.deepEqual(filterAuditEvents(events, { sessionId: 'sess-1' }).map((event) => event.event), [
     'advisor_verdict.recorded',
-    'executor_decision.recorded',
+    'executor.final_review_decision.recorded',
   ]);
   assert.equal(captureMain(['raw', '--root', ctx.root, '--runtime-root', ctx.runtimeRoot]).json.count, 3);
   assert.deepEqual(captureMain(['task', '--root', ctx.root, '--runtime-root', ctx.runtimeRoot, '--task-id', 'task-1']).json.events.map((event) => event.event), [
@@ -147,7 +147,7 @@ test('readAuditEvents filterAuditEvents and main provide raw task session and co
   ]);
   assert.deepEqual(captureMain(['session', '--root', ctx.root, '--runtime-root', ctx.runtimeRoot, '--session-id', 'sess-1']).json.events.map((event) => event.event), [
     'advisor_verdict.recorded',
-    'executor_decision.recorded',
+    'executor.final_review_decision.recorded',
   ]);
   assert.equal(captureMain(['raw', '--root', ctx.root, '--runtime-root', ctx.runtimeRoot, '--correlation-key', 'corr-2']).json.events[0].taskId, 'task-2');
 });
@@ -227,7 +227,7 @@ test('producer integrations write complete audit surface with dual correlation f
   for (const eventName of [
     'provider_route.executor_call',
     'provider_route.resolved',
-    'executor_decision.recorded',
+    'executor.final_review_decision.recorded',
     'verification.evidence.recorded',
     'advisor.triggered',
     'hook_decision.recorded',
