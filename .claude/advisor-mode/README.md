@@ -159,3 +159,44 @@ Before enabling a live provider route, confirm current gateway documentation and
 6. `ANTHROPIC_BASE_URL` and `ANTHROPIC_AUTH_TOKEN` or provider-specific equivalent environment variables.
 
 Phase 4 stops at routing and targeted conformance. Budget controls, rollback controls, and broader install doctor workflows remain Phase 5 scope.
+
+## Doctor validation
+
+Run the Advisor Mode doctor from the repository root:
+
+```bash
+node .claude/advisor-mode/doctor.js --json
+```
+
+Use `--pretty` for indented JSON output:
+
+```bash
+node .claude/advisor-mode/doctor.js --pretty
+```
+
+Use `--root <path>` to validate a different project root and `--runtime-root <path>` to direct runtime audit/state probes to a specific ignored runtime directory:
+
+```bash
+node .claude/advisor-mode/doctor.js --root /path/to/project --runtime-root /tmp/advisor-runtime --json
+```
+
+Use `--smoke` for explicit smoke-mode doctor runs. The default doctor does not make live provider calls; provider health comes from existing provider conformance state unless a future smoke check is explicitly wired.
+
+Doctor is read-only for project assets. It does not mutate `.claude/settings.json`, `.claude/agents/advisor-reviewer.md`, `.claude/advisor-mode/policy.example.json`, or provider route files. It writes only runtime audit/state artifacts:
+
+- `state/doctor.json` — latest `advisor-mode-doctor` state artifact.
+- `audit/events.jsonl` — append-only `doctor.completed` audit event plus audit probe evidence.
+
+Doctor check IDs:
+
+| Check ID               | Operator meaning                                                                                                    |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `install.assets`       | Required Advisor Mode assets exist: settings, advisor agent, policy, provider routes, and planning config.          |
+| `hooks.wiring`         | `.claude/settings.json` registers advisor gate, final review gate, failure tracker, and executor route audit hooks. |
+| `advisor.permissions`  | `advisor-reviewer` declares read-only tools and excludes `Write`, `Edit`, `MultiEdit`, and `Bash`.                  |
+| `provider.routes`      | Provider route config validates semantic aliases without literal secrets or forbidden payload fields.               |
+| `provider.conformance` | Latest provider conformance state exists and reports pass; run provider conformance to refresh it.                  |
+| `runtime.paths`        | Runtime audit and state directories are writable.                                                                   |
+| `audit.raw_stream`     | Append-only audit stream can be written and read through the shared audit helper.                                   |
+| `budget.policy`        | Advisor budget policy loads with task/session call, token, and latency caps.                                        |
+| `recovery.mode`        | Current operator mode resolves to enforce, warning-only, or disabled/kill-switch semantics.                         |
