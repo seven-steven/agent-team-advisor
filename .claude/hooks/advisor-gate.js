@@ -5,6 +5,7 @@ const crypto = require('node:crypto');
 const { runtimePath } = require('../advisor-mode/runtime-paths.js');
 const { appendAuditEvent, buildCorrelationFields } = require('../advisor-mode/audit-log.js');
 const { recordAdvisorUsage, evaluateBudget } = require('../advisor-mode/budget-state.js');
+const { evaluateOperatorRecovery } = require('../advisor-mode/operator-recovery.js');
 const { normalizeFailureSignature } = require('./advisor-failure-tracker.js');
 const {
   loadRouteConfig,
@@ -600,8 +601,9 @@ function recordAdvisorArtifactUsage(input = {}, options = {}) {
 
 function evaluateGatePolicy(rawEvent, options = {}) {
   const root = getRoot(options);
-  if (!isAdvisorModeEnabled(root)) return auditGateResult({ gateAction: 'none', reasonCode: 'advisor-mode-disabled' }, options);
-  const strictMode = isAdvisorModeStrict(root);
+  const recovery = evaluateOperatorRecovery(rawEvent || {}, { ...options, root, capability: 'advisorConsultation' });
+  if (recovery.mode === 'disabled') return auditGateResult({ gateAction: 'none', reasonCode: 'advisor-mode-disabled' }, options);
+  const strictMode = recovery.mode === 'enforce';
   const event = buildGateEvent(rawEvent);
   if (event.failOpen) return auditGateResult({ gateAction: 'none', failOpen: true, reasonCode: event.reasonCode }, options);
   if (!GATED_MATCHER_TOOLS.has(event.toolName)) return auditGateResult({ gateAction: 'none' }, options);
@@ -639,6 +641,17 @@ function evaluateGatePolicy(rawEvent, options = {}) {
     policyRuleId: rule.id,
   };
   if (rule.gateAction === 'human-approval') {
+    const decisionRecovery = evaluateOperatorRecovery(event, {
+      ...options,
+      root,
+      capability: rule.auditLabel === 'protected-surface.review' ? 'protectedSurfaces' : 'criticalHumanApproval',
+    });
+    if (!decisionRecovery.capabilityEnabled) {
+      return auditGateResult(advisoryOnlyResult(
+        { workflowGateStatus: 'advisory-operator-capability-disabled', reasonCode: decisionRecovery.reasonCode, correlationKey: paths.correlationKey, policyRuleId: rule.id },
+        'Operator recovery capability disabled; advisory mode continues for this gate.',
+      ), options);
+    }
     const decisionPacket = buildDecisionPacket(
       {
         correlationKey: paths.correlationKey,
@@ -699,6 +712,12 @@ function evaluateGatePolicy(rawEvent, options = {}) {
   }
 
   const readResult = readAdvisorRecommendation(paths.recommendationPath);
+  if (!recovery.capabilityEnabled) {
+    return auditGateResult(advisoryOnlyResult(
+      { workflowGateStatus: 'advisory-operator-capability-disabled', reasonCode: recovery.reasonCode, correlationKey: paths.correlationKey, policyRuleId: rule.id },
+      'Operator recovery capability disabled; advisory mode continues for non-critical advisor path.',
+    ), options);
+  }
   if (readResult.ok && validateAdvisorRecommendation(readResult.recommendation, request)) {
     recordAdvisorUsage({
       eventType: 'advisor_recommendation',
