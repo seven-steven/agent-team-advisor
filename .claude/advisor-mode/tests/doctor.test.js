@@ -212,10 +212,13 @@ test('CLI exits non-zero when doctor status fails', () => {
   assert.ok(payload.checks.find((check) => check.id === 'install.assets').repair.length > 0);
 });
 
-test('README documents doctor commands and every check ID', () => {
+test('README documents doctor commands, every check ID, offline default, smoke opt-in, and Phase 05 quick run', () => {
   const readme = fs.readFileSync(path.resolve(__dirname, '..', 'README.md'), 'utf8');
   assert.match(readme, /Doctor validation/);
   assert.match(readme, /node \.claude\/advisor-mode\/doctor\.js --json/);
+  assert.match(readme, /read-only\/offline by default|offline\/read-only by default/);
+  assert.match(readme, /smoke checks require `--smoke`|`--smoke`[^\n]+smoke checks/);
+  assert.match(readme, /node --test \.claude\/advisor-mode\/tests\/audit-log\.test\.js \.claude\/advisor-mode\/tests\/budget-state\.test\.js \.claude\/advisor-mode\/tests\/doctor\.test\.js \.claude\/advisor-mode\/tests\/rollback\.test\.js/);
   for (const checkId of CHECK_IDS) assert.match(readme, new RegExp(checkId.replace('.', '\\.')));
 });
 
