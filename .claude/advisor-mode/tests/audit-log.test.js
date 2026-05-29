@@ -203,8 +203,8 @@ test('producer integrations write complete audit surface with dual correlation f
   for (const eventName of [
     'provider_route.executor_call',
     'provider_route.resolved',
-    'executor_decision.recorded',
-    'verification_evidence.recorded',
+    'executor.final_review_decision.recorded',
+    'verification.evidence.recorded',
     'advisor.triggered',
     'hook_decision.recorded',
     'human_approval.disposition',

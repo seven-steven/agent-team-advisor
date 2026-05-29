@@ -34,9 +34,15 @@ function stableStringify(value) {
 function normalizeEvent(raw) {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
   const toolName = raw.toolName || raw.tool_name;
+  const correlationFields = buildCorrelationFields(raw);
+  const explicitCorrelationFields = {};
+  if (raw.correlationKey || raw.correlation_key) explicitCorrelationFields.correlationKey = correlationFields.correlationKey;
+  if (correlationFields.taskId) explicitCorrelationFields.taskId = correlationFields.taskId;
+  if (correlationFields.sessionId) explicitCorrelationFields.sessionId = correlationFields.sessionId;
   if (!toolName) {
     return {
       hookEventName: raw.hookEventName || raw.hook_event_name || 'PreToolUse',
+      ...explicitCorrelationFields,
       failOpen: true,
       reasonCode: 'missing-tool-name',
     };
@@ -48,7 +54,7 @@ function normalizeEvent(raw) {
     taskState: raw.taskState || raw.task_state || 'unknown',
     failureCount: Number(raw.failureCount ?? raw.failure_count ?? 0),
     actionClass: raw.actionClass || raw.action_class,
-    ...buildCorrelationFields(raw),
+    ...explicitCorrelationFields,
     failOpen: false,
   };
 }
