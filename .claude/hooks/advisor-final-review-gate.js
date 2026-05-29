@@ -132,7 +132,13 @@ function evaluateFinalReviewGate(event = {}, options = {}) {
     budgetStatus = { ok: false, degraded: false, reasonCode: 'advisor-budget-state-invalid', error: error.message, eventType: 'advisor_final_review' };
   }
 
-  const withBudget = (result) => (budgetStatus && !budgetStatus.ok ? { ...result, budgetStatus } : result);
+  const withBudget = (result) => {
+    if (!budgetStatus || budgetStatus.ok) return result;
+    if (strictMode && budgetStatus.reasonCode === 'advisor-budget-state-invalid' && result.gateAction === 'allow') {
+      return block('advisor-budget-state-invalid', 'Advisor Mode budget state is invalid; fresh final review cannot be accepted until budget state is repaired.', { budgetStatus });
+    }
+    return { ...result, budgetStatus };
+  };
 
   const freshnessInput = buildFreshnessInput(event);
   const freshness = isFinalReviewFresh(freshnessInput, { root });

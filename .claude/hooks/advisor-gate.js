@@ -638,28 +638,6 @@ function evaluateGatePolicy(rawEvent, options = {}) {
     sessionId: event.sessionId,
     policyRuleId: rule.id,
   };
-  const budgetStatus = evaluateBudget(budgetInput, { ...options, root, policy });
-  if (!budgetStatus.ok && rule.gateAction !== 'human-approval') {
-    return auditGateResult(advisoryOnlyResult(
-      {
-        workflowGateStatus: 'advisory-budget-exceeded',
-        retryRequired: false,
-        reentryAllowed: true,
-        reasonCode: 'advisor-budget-exceeded',
-        budgetStatus,
-        correlationKey: paths.correlationKey,
-        requestPath: paths.requestPath,
-        recommendationPath: paths.recommendationPath,
-        policyRuleId: rule.id,
-        auditLabel: rule.auditLabel,
-        actionClass: classes.actionClass,
-        failureSignature: persistedFailure.signature,
-        failureCount: event.failureCount,
-      },
-      'Advisor budget exceeded; degraded warning-only mode continues for non-critical advisor path.',
-      'Advisor budget exceeded; degraded warning-only mode continues for non-critical advisor path.',
-    ), options);
-  }
   if (rule.gateAction === 'human-approval') {
     const decisionPacket = buildDecisionPacket(
       {
@@ -751,6 +729,40 @@ function evaluateGatePolicy(rawEvent, options = {}) {
       failureCount: event.failureCount,
       hookOutput: buildDecision('allow', 'Valid read-only advisor recommendation exists; explicit retry may proceed.'),
     }, options);
+  }
+
+  let budgetStatus;
+  try {
+    budgetStatus = evaluateBudget(budgetInput, { ...options, root, policy });
+  } catch (error) {
+    const invalidBudget = { ok: false, degraded: false, reasonCode: 'advisor-budget-state-invalid', error: error.message };
+    return strictMode
+      ? auditGateResult(hardStop('advisor-budget-state-invalid', 'Advisor Mode budget state is invalid; blocking configured gate event.'), options)
+      : auditGateResult(advisoryOnlyResult(
+          { workflowGateStatus: 'advisory-budget-state-invalid', reasonCode: 'advisor-budget-state-invalid', budgetStatus: invalidBudget, correlationKey: paths.correlationKey, policyRuleId: rule.id },
+          'Advisor budget state is invalid; degraded warning-only mode continues for non-critical advisor path.',
+        ), options);
+  }
+  if (!budgetStatus.ok && rule.gateAction !== 'human-approval') {
+    return auditGateResult(advisoryOnlyResult(
+      {
+        workflowGateStatus: 'advisory-budget-exceeded',
+        retryRequired: false,
+        reentryAllowed: true,
+        reasonCode: 'advisor-budget-exceeded',
+        budgetStatus,
+        correlationKey: paths.correlationKey,
+        requestPath: paths.requestPath,
+        recommendationPath: paths.recommendationPath,
+        policyRuleId: rule.id,
+        auditLabel: rule.auditLabel,
+        actionClass: classes.actionClass,
+        failureSignature: persistedFailure.signature,
+        failureCount: event.failureCount,
+      },
+      'Advisor budget exceeded; degraded warning-only mode continues for non-critical advisor path.',
+      'Advisor budget exceeded; degraded warning-only mode continues for non-critical advisor path.',
+    ), options);
   }
 
   try {

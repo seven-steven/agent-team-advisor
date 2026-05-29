@@ -177,3 +177,31 @@ test('final-review verdict recording increments task and session usage once with
   assert.equal(state.scopes['task:task-budget-1'].advisorTokens, 800);
   assert.equal(state.scopes['session:session-budget-1'].advisorLatencyMs, 25000);
 });
+
+
+test('ordinary advisor recommendation artifact re-read is idempotent', () => {
+  const root = makeTempRoot('advisor-budget-idempotent-');
+  const policy = budgetPolicy();
+  const artifact = { eventType: 'advisor_recommendation', correlationKey: 'ordinary-once', taskId: 'task-budget-1', sessionId: 'session-budget-1', advisorTokens: 700, advisorLatencyMs: 20000, artifactPath: '.advisor/consultations/recommendations/ordinary-once.json' };
+
+  gate.recordAdvisorArtifactUsage(artifact, { root, policy });
+  gate.recordAdvisorArtifactUsage(artifact, { root, policy });
+  const state = budget.readBudgetState({ root });
+
+  assert.equal(state.scopes['task:task-budget-1'].advisorCalls, 1);
+  assert.equal(state.scopes['task:task-budget-1'].advisorTokens, 700);
+  assert.equal(state.scopes['task:task-budget-1'].advisorLatencyMs, 20000);
+});
+
+test('final-review verdict re-read is idempotent even when metadata is missing', () => {
+  const root = makeTempRoot('advisor-budget-final-idempotent-');
+  const policy = budgetPolicy();
+
+  finalReview.recordFinalReviewVerdictUsage({ correlationKey: 'final-unknown', taskId: 'task-budget-1', sessionId: 'session-budget-1', usageSource: 'unknown' }, { root, policy });
+  finalReview.recordFinalReviewVerdictUsage({ correlationKey: 'final-unknown', taskId: 'task-budget-1', sessionId: 'session-budget-1', usageSource: 'unknown' }, { root, policy });
+  const state = budget.readBudgetState({ root });
+
+  assert.equal(state.scopes['task:task-budget-1'].advisorCalls, 1);
+  assert.equal(state.scopes['task:task-budget-1'].advisorTokens, 0);
+  assert.equal(state.scopes['task:task-budget-1'].advisorLatencyMs, 0);
+});

@@ -17,7 +17,7 @@ function budgetStatePath(root, options = {}) {
 function loadBudgetPolicy(options = {}) {
   const root = getRoot(options);
   const policyPath = options.policyPath || path.join(root, '.claude', 'advisor-mode', 'policy.example.json');
-  const policy = options.policy || JSON.parse(fs.readFileSync(policyPath, 'utf8'));
+  const policy = options.policy || (fs.existsSync(policyPath) ? JSON.parse(fs.readFileSync(policyPath, 'utf8')) : {});
   const budget = policy && policy.advisorMode && policy.advisorMode.budget;
   const scopes = budget && budget.scopes ? budget.scopes : {};
   return {
@@ -117,7 +117,7 @@ function recordAdvisorUsage(input = {}, options = {}) {
     if (applyUsage(usage, input)) recorded = true;
     state.scopes[key] = usage;
   }
-  writeBudgetState(state, options);
+  if (recorded) writeBudgetState(state, options);
   return { recorded, state };
 }
 

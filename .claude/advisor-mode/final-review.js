@@ -589,6 +589,15 @@ function recordFinalReviewState(input = {}, options = {}) {
 
   const statePath = finalReviewStatePath(root);
   writeJson(statePath, state);
+  recordFinalReviewVerdictUsage({
+    correlationKey: input.correlationKey,
+    taskId: input.taskId,
+    sessionId: input.sessionId,
+    artifactPath: input.verdict_ref,
+    advisorTokens: input.advisorTokens,
+    advisorLatencyMs: input.advisorLatencyMs,
+    usageSource: input.advisorTokens === undefined && input.advisorLatencyMs === undefined ? 'unknown' : 'metadata',
+  }, { ...options, root });
   return { ok: true, path: statePath, state };
 }
 
