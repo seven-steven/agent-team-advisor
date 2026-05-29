@@ -185,7 +185,6 @@ test('evaluateGatePolicy reads persisted repeated failure state for real PreTool
   assert.equal(result.failureCount, 2);
 });
 
-
 test('critical D-10 classes emit human approval only after matching advisor recommendation exists', () => {
   const root = makeTempRoot();
   for (const decisionClass of d10DecisionClasses) {
@@ -273,7 +272,11 @@ test('evaluateGatePolicy routes destructive force-push credential and production
           disposition,
           decidedBy: 'human-operator',
           rationale: `${disposition} ${testCase.name}`,
-          appliesTo: { event: packet.event },
+          appliesTo: {
+            event: packet.event,
+            requestPath: packet.approvalContext.requestPath,
+            recommendationDigest: packet.approvalContext.recommendationDigest,
+          },
         },
         { root },
       );
@@ -320,7 +323,11 @@ test('implementation-state force-push critical-action-human-approval through eva
         disposition,
         decidedBy: 'human-operator',
         rationale: `${disposition} implementation-state git push --force`,
-        appliesTo: { event: recommendationOnly.event },
+        appliesTo: {
+          event: recommendationOnly.event,
+          requestPath: recommendationOnly.approvalContext.requestPath,
+          recommendationDigest: recommendationOnly.approvalContext.recommendationDigest,
+        },
       },
       { root },
     );
@@ -437,7 +444,11 @@ test('human re-entry blocks absent malformed mismatched stale dispositions and s
       disposition: 'approve',
       decidedBy: 'human-operator',
       rationale: 'Valid approval.',
-      appliesTo: { event: 'human_approval.required' },
+      appliesTo: {
+        event: 'human_approval.required',
+        requestPath: packet.approvalContext.requestPath,
+        recommendationDigest: packet.approvalContext.recommendationDigest,
+      },
     },
     { root },
   );
@@ -460,7 +471,11 @@ test('valid disposition still requires explicit retry and never models host wait
       disposition: 'approve',
       decidedBy: 'human-operator',
       rationale: 'Approved with explicit retry.',
-      appliesTo: { event: packet.event },
+      appliesTo: {
+        event: packet.event,
+        requestPath: packet.approvalContext.requestPath,
+        recommendationDigest: packet.approvalContext.recommendationDigest,
+      },
     },
     { root },
   );

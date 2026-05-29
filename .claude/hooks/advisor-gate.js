@@ -385,6 +385,10 @@ function isString(value) {
   return typeof value === 'string' && value.trim().length > 0;
 }
 
+function getRecommendationDigest(recommendation) {
+  return crypto.createHash('sha256').update(stableStringify(recommendation || null)).digest('hex');
+}
+
 function validateAdvisorRecommendation(recommendation, request) {
   const required = [
     'correlationKey',
@@ -491,6 +495,7 @@ function buildDecisionPacket(input = {}, options = {}) {
     return { gateAction: 'none', reasonCode: 'non-critical-decision-class', correlationKey };
   }
 
+  const advisorRecommendation = readResult.recommendation;
   const packet = {
     correlationKey,
     taskId: request.taskId,
@@ -505,7 +510,12 @@ function buildDecisionPacket(input = {}, options = {}) {
       label: disposition,
       requiresExplicitRetry: true,
     })),
-    advisorRecommendation: readResult.recommendation,
+    advisorRecommendation,
+    approvalContext: {
+      requestPath,
+      recommendationPath,
+      recommendationDigest: getRecommendationDigest(advisorRecommendation),
+    },
     expectedConsequences: Array.isArray(input.expectedConsequences) ? input.expectedConsequences : [],
     suggestedVerificationPoints: Array.isArray(input.suggestedVerificationPoints) ? input.suggestedVerificationPoints : [],
     workflowGateStatus: 'blocked-pending-human',
@@ -556,6 +566,9 @@ function validateDisposition(disposition, packet) {
   if (!HUMAN_DISPOSITIONS.includes(disposition.disposition)) return false;
   if (!isString(disposition.decidedBy) || !isString(disposition.decidedAt) || !isString(disposition.rationale)) return false;
   if (!disposition.appliesTo || disposition.appliesTo.event !== packet.event) return false;
+  const approvalContext = packet.approvalContext || {};
+  if (approvalContext.requestPath && disposition.appliesTo.requestPath !== approvalContext.requestPath) return false;
+  if (approvalContext.recommendationDigest && disposition.appliesTo.recommendationDigest !== approvalContext.recommendationDigest) return false;
   if (disposition.conditions !== undefined && !Array.isArray(disposition.conditions)) return false;
   return true;
 }
@@ -885,6 +898,7 @@ module.exports = {
   writeConsultationRequest,
   readAdvisorRecommendation,
   buildAdvisorProducerInstruction,
+  getRecommendationDigest,
   validateAdvisorRecommendation,
   buildRuntimeRouteMetadata,
   buildRequest,
