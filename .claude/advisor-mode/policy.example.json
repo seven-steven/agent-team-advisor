@@ -16,6 +16,22 @@
         "executor.followup.recorded"
       ]
     },
+    "budget": {
+      "enabled": true,
+      "overLimitMode": "degraded",
+      "scopes": {
+        "task": {
+          "advisorCalls": 2,
+          "advisorTokens": 1000,
+          "advisorLatencyMs": 30000
+        },
+        "session": {
+          "advisorCalls": 5,
+          "advisorTokens": 5000,
+          "advisorLatencyMs": 120000
+        }
+      }
+    },
     "gates": {
       "failureThreshold": 2,
       "toolClasses": {

@@ -4,6 +4,7 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 const { runtimePath } = require('../advisor-mode/runtime-paths.js');
 const { appendAuditEvent, buildCorrelationFields } = require('../advisor-mode/audit-log.js');
+const { recordAdvisorUsage, evaluateBudget } = require('../advisor-mode/budget-state.js');
 const { normalizeFailureSignature } = require('./advisor-failure-tracker.js');
 const {
   loadRouteConfig,
@@ -593,6 +594,10 @@ function auditGateResult(result = {}, options = {}) {
   return result;
 }
 
+function recordAdvisorArtifactUsage(input = {}, options = {}) {
+  return recordAdvisorUsage(input, options);
+}
+
 function evaluateGatePolicy(rawEvent, options = {}) {
   const root = getRoot(options);
   if (!isAdvisorModeEnabled(root)) return auditGateResult({ gateAction: 'none', reasonCode: 'advisor-mode-disabled' }, options);
@@ -626,6 +631,35 @@ function evaluateGatePolicy(rawEvent, options = {}) {
 
   const paths = getConsultationPaths(event, options);
   const request = buildRequest(event, classes, rule, paths, options);
+  const budgetInput = {
+    eventType: 'advisor_call',
+    correlationKey: paths.correlationKey,
+    taskId: event.taskId,
+    sessionId: event.sessionId,
+    policyRuleId: rule.id,
+  };
+  const budgetStatus = evaluateBudget(budgetInput, { ...options, root, policy });
+  if (!budgetStatus.ok && rule.gateAction !== 'human-approval') {
+    return auditGateResult(advisoryOnlyResult(
+      {
+        workflowGateStatus: 'advisory-budget-exceeded',
+        retryRequired: false,
+        reentryAllowed: true,
+        reasonCode: 'advisor-budget-exceeded',
+        budgetStatus,
+        correlationKey: paths.correlationKey,
+        requestPath: paths.requestPath,
+        recommendationPath: paths.recommendationPath,
+        policyRuleId: rule.id,
+        auditLabel: rule.auditLabel,
+        actionClass: classes.actionClass,
+        failureSignature: persistedFailure.signature,
+        failureCount: event.failureCount,
+      },
+      'Advisor budget exceeded; degraded warning-only mode continues for non-critical advisor path.',
+      'Advisor budget exceeded; degraded warning-only mode continues for non-critical advisor path.',
+    ), options);
+  }
   if (rule.gateAction === 'human-approval') {
     const decisionPacket = buildDecisionPacket(
       {
@@ -688,6 +722,15 @@ function evaluateGatePolicy(rawEvent, options = {}) {
 
   const readResult = readAdvisorRecommendation(paths.recommendationPath);
   if (readResult.ok && validateAdvisorRecommendation(readResult.recommendation, request)) {
+    recordAdvisorUsage({
+      eventType: 'advisor_recommendation',
+      correlationKey: paths.correlationKey,
+      taskId: event.taskId,
+      sessionId: event.sessionId,
+      advisorTokens: readResult.recommendation.advisorTokens,
+      advisorLatencyMs: readResult.recommendation.advisorLatencyMs,
+      artifactPath: paths.recommendationPath,
+    }, { ...options, root, policy });
     return auditGateResult({
       gateAction: 'allow',
       workflowGateStatus: 'satisfied',
@@ -712,6 +755,7 @@ function evaluateGatePolicy(rawEvent, options = {}) {
 
   try {
     writeConsultationRequest(request);
+    recordAdvisorUsage(budgetInput, { ...options, root, policy });
   } catch (error) {
     return auditGateResult(hardStop('request-write-failed', 'Advisor Mode consultation request could not be written; blocking configured gate event.'), options);
   }
@@ -802,6 +846,7 @@ module.exports = {
   validateDisposition,
   evaluateHumanGateReentry,
   readPersistedFailureCount,
+  recordAdvisorArtifactUsage,
   evaluateGatePolicy,
   buildGateEvent,
   main,

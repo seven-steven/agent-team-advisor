@@ -2,6 +2,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { runtimePath } = require('./runtime-paths.js');
 const { appendAuditEvent } = require('./audit-log.js');
+const { recordAdvisorUsage } = require('./budget-state.js');
 
 const VERDICT_SCHEMA_PATH = path.join(__dirname, 'verdict.schema.json');
 const VALID_VERDICT_VALUES = {
@@ -618,6 +619,10 @@ function isFinalReviewFresh(input = {}, options = {}) {
   };
 }
 
+function recordFinalReviewVerdictUsage(input = {}, options = {}) {
+  return recordAdvisorUsage({ ...input, eventType: 'advisor_final_review' }, options);
+}
+
 module.exports = {
   buildContextPacket,
   validateContextPacket,
@@ -629,4 +634,5 @@ module.exports = {
   validateVerificationEvidence,
   recordFinalReviewState,
   isFinalReviewFresh,
+  recordFinalReviewVerdictUsage,
 };

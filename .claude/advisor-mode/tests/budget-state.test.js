@@ -96,7 +96,9 @@ test('evaluateBudget enforces advisor call, token, and latency hard caps across 
   assert.equal(result.ok, false);
   assert.equal(result.degraded, true);
   assert.equal(result.reasonCode, 'advisor-budget-exceeded');
-  assert.deepEqual(result.exceeded.map((item) => item.dimension).sort(), ['advisorLatencyMs', 'advisorTokens']);
+  assert.ok(result.exceeded.some((item) => item.dimension === 'advisorCalls' && item.scope === 'task'));
+  assert.ok(result.exceeded.some((item) => item.dimension === 'advisorTokens' && item.scope === 'task'));
+  assert.ok(result.exceeded.some((item) => item.dimension === 'advisorLatencyMs' && item.scope === 'task'));
   assert.ok(result.exceeded.some((item) => item.scope === 'task' && item.limit === 1000 && item.actual === 1100));
   assert.equal(fs.existsSync(runtimePath(root, ['state', 'advisor-budget.json'])), true);
   assert.equal(fs.existsSync(path.join(root, '.planning', 'advisor-budget.json')), false);
