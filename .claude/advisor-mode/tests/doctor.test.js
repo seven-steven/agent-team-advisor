@@ -211,3 +211,15 @@ test('CLI exits non-zero when doctor status fails', () => {
   assert.equal(payload.status, 'fail');
   assert.ok(payload.checks.find((check) => check.id === 'install.assets').repair.length > 0);
 });
+
+test('README documents doctor commands and every check ID', () => {
+  const readme = fs.readFileSync(path.resolve(__dirname, '..', 'README.md'), 'utf8');
+  assert.match(readme, /Doctor validation/);
+  assert.match(readme, /node \.claude\/advisor-mode\/doctor\.js --json/);
+  for (const checkId of CHECK_IDS) assert.match(readme, new RegExp(checkId.replace('.', '\\.')));
+});
+
+test('doctor public exports remain stable', () => {
+  const doctor = require('../doctor.js');
+  assert.deepEqual(Object.keys(doctor).sort(), ['buildDoctorArtifact', 'main', 'runDoctor', 'runDoctorCheck'].sort());
+});
