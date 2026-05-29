@@ -165,7 +165,11 @@ test('evaluateGatePolicy unlocks protected human approval retry after dispositio
       disposition: 'approve',
       decidedBy: 'human-operator',
       rationale: 'Approved protected surface retry.',
-      appliesTo: { event: packet.event },
+      appliesTo: {
+        event: packet.event,
+        requestPath: packet.approvalContext.requestPath,
+        recommendationDigest: packet.approvalContext.recommendationDigest,
+      },
     },
     { root },
   );
@@ -216,7 +220,11 @@ test('critical protected re-entry requires matching approve reject revise or def
         disposition,
         decidedBy: 'human-operator',
         rationale: `${disposition} protected surface change`,
-        appliesTo: { event: packet.event },
+        appliesTo: {
+          event: packet.event,
+          requestPath: packet.approvalContext.requestPath,
+          recommendationDigest: packet.approvalContext.recommendationDigest,
+        },
       },
       { root, dispositionPath },
     );

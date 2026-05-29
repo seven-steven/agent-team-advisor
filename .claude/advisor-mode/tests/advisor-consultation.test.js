@@ -193,7 +193,11 @@ test('implementation-state git push --force critical-action-human-approval stays
       disposition: 'approve',
       decidedBy: 'human-operator',
       rationale: 'Approve implementation-state git push --force retry.',
-      appliesTo: { event: recommendationOnly.event },
+      appliesTo: {
+        event: recommendationOnly.event,
+        requestPath: recommendationOnly.approvalContext.requestPath,
+        recommendationDigest: recommendationOnly.approvalContext.recommendationDigest,
+      },
     },
     { root },
   );
@@ -205,21 +209,48 @@ test('implementation-state git push --force critical-action-human-approval stays
   assert.equal(retry.disposition, 'approve');
 });
 
-test('Read and low-risk events do not create advisor consultation artifacts', () => {
+test('human approval disposition must match the current advisor recommendation version before retry is unlocked', () => {
   const root = makeTempRoot();
-  const readResult = gate.evaluateGatePolicy(
-    { hookEventName: 'PreToolUse', toolName: 'Read', toolInput: { file_path: 'README.md' } },
+  const event = highRiskBashEvent();
+  const first = gate.evaluateGatePolicy(event, { root });
+  const firstRequest = JSON.parse(fs.readFileSync(first.requestPath, 'utf8'));
+  writeJson(first.recommendationPath, validRecommendation(firstRequest));
+
+  const packet = gate.evaluateGatePolicy(event, { root });
+  assert.equal(packet.event, 'human_approval.required');
+  assert.equal(packet.workflowGateStatus, 'blocked-pending-human');
+
+  gate.writeDisposition(
+    {
+      correlationKey: packet.correlationKey,
+      disposition: 'approve',
+      decidedBy: 'human-operator',
+      rationale: 'Approve only the first advisor recommendation.',
+      appliesTo: {
+        event: packet.event,
+        requestPath: packet.advisorRecommendation.requestPath,
+        recommendationDigest: gate.getRecommendationDigest(packet.advisorRecommendation),
+      },
+    },
     { root },
   );
-  const lowRiskResult = gate.evaluateGatePolicy(
-    { hookEventName: 'PreToolUse', toolName: 'Bash', toolInput: { command: 'git status --short' } },
-    { root },
+  const satisfied = gate.evaluateGatePolicy(event, { root });
+  assert.equal(satisfied.gateAction, 'allow');
+  assert.equal(satisfied.workflowGateStatus, 'satisfied');
+
+  writeJson(
+    packet.approvalContext.recommendationPath,
+    validRecommendation(firstRequest, {
+      recommendation: 'A refreshed advisor review changed the recommendation body.',
+      rationale: 'The request was reconsidered and needs a fresh human disposition.',
+    }),
   );
 
-  assert.equal(readResult.gateAction, 'none');
-  assert.equal(lowRiskResult.gateAction, 'none');
-  assert.deepEqual(fs.readdirSync(path.join(root, '.advisor', 'consultations', 'requests')), []);
-  assert.deepEqual(fs.readdirSync(path.join(root, '.advisor', 'consultations', 'recommendations')), []);
+  const replayAttempt = gate.evaluateGatePolicy(event, { root });
+  assert.equal(replayAttempt.event, 'human_approval.required');
+  assert.equal(replayAttempt.workflowGateStatus, 'blocked-pending-human');
+  assert.equal(replayAttempt.reentryAllowed, false);
+  assert.equal(replayAttempt.reasonCode, 'invalid-disposition-artifact');
 });
 
 test('policy evaluation combines tool path action failure count and task state dimensions', () => {
