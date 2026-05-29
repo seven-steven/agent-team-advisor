@@ -214,7 +214,19 @@ test('producer integrations write complete audit surface with dual correlation f
   const humanPacket = gate.evaluateGatePolicy(gateEvent, ctx);
   assert.equal(humanPacket.event, 'human_approval.required');
   gate.writeDisposition(
-    { correlationKey: humanPacket.correlationKey, disposition: 'approve', decidedBy: 'operator', rationale: 'Approved.', appliesTo: { event: 'human_approval.required' }, taskId: 'task-producer', sessionId: 'sess-producer' },
+    {
+      correlationKey: humanPacket.correlationKey,
+      disposition: 'approve',
+      decidedBy: 'operator',
+      rationale: 'Approved.',
+      appliesTo: {
+        event: 'human_approval.required',
+        requestPath: humanPacket.approvalContext.requestPath,
+        recommendationDigest: humanPacket.approvalContext.recommendationDigest,
+      },
+      taskId: 'task-producer',
+      sessionId: 'sess-producer',
+    },
     ctx,
   );
   const allowed = gate.evaluateGatePolicy(gateEvent, ctx);
