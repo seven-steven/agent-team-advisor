@@ -370,7 +370,7 @@ function writeJson(filePath, value) {
 function appendExecutorDecisionAudit(artifact, artifactPath, options = {}) {
   appendAuditEvent(
     {
-      event: 'executor_decision.recorded',
+      event: 'executor.final_review_decision.recorded',
       correlationKey: artifact.correlationKey,
       taskId: options.taskId || artifact.taskId,
       sessionId: options.sessionId || artifact.sessionId,
@@ -493,7 +493,7 @@ function validateVerificationEvidence(artifact) {
 function appendVerificationEvidenceAudit(artifact, artifactPath, options = {}) {
   appendAuditEvent(
     {
-      event: 'verification_evidence.recorded',
+      event: 'verification.evidence.recorded',
       correlationKey: artifact.correlationKey,
       taskId: options.taskId || artifact.taskId,
       sessionId: options.sessionId || artifact.sessionId,
