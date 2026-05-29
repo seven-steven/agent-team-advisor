@@ -129,7 +129,7 @@ Plans:
 4. Project maintainer can disable advisor enforcement or switch to warning-only mode through a documented kill switch or rollback path.
 5. User can run a doctor or validation command that verifies required hooks, routes, advisor permissions, and project assets are installed correctly.
 
-**Plans:** 6/8 plans executed
+**Plans:** 7/8 plans executed
 
 Plans:
 
@@ -160,4 +160,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | 2. Enforced Trigger Gates                    | 6/6            | Complete | 2026-05-22 |
 | 3. Verdict Handoff and Verification Evidence | 7/7            | Complete | 2026-05-27 |
 | 4. Provider Routing and Conformance          | 4/4            | Complete | 2026-05-29 |
-| 5. Audit, Budget, and Operator Recovery      | 6/8 | In Progress|  |
+| 5. Audit, Budget, and Operator Recovery      | 7/8 | In Progress|  |
