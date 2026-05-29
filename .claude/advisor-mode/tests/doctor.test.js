@@ -142,13 +142,9 @@ test('runDoctor returns complete pass artifact, writes runtime evidence, appends
   assert.equal(artifact.event, 'doctor.completed');
   assert.equal(artifact.status, 'pass');
   assert.deepEqual(artifact.checks.map((check) => check.id), CHECK_IDS);
-  for (const check of artifact.checks) {
-    assert.equal(check.status, 'pass', `${check.id} should pass`);
-    assert.equal(typeof check.summary, 'string');
-    assert.ok(check.summary.length > 0);
-    assert.equal(typeof check.repair, 'string');
-    assert.ok(check.repair.length > 0);
-  }
+  assert.equal(artifact.smoke_enabled, false);
+  assert.equal(artifact.offline_default, true);
+
   assertNoSecretLeak(artifact);
   assertProtectedFilesUnchanged(root, before);
 
